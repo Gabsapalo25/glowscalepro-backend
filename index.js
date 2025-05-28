@@ -10,50 +10,46 @@ const PORT = process.env.PORT || 3000;
 app.use(cors());
 app.use(express.json());
 
-// Nodemailer transporter configuration (Zoho SMTP)
+// Configuração do Nodemailer com Zoho
 const transporter = nodemailer.createTransport({
   host: process.env.SMTP_HOST,
   port: parseInt(process.env.SMTP_PORT),
   secure: true,
   auth: {
-    user: process.env.EMAIL_USER,
-    pass: process.env.EMAIL_PASS,
+    user: process.env.SMTP_USER,
+    pass: process.env.SMTP_PASS,
   },
   tls: {
-    rejectUnauthorized: false, // Use only in development
+    rejectUnauthorized: false, // Use apenas em ambiente de desenvolvimento
   },
 });
 
-// Verify transporter
-transporter.verify(function (error, success) {
+// Verifica a conexão com o servidor SMTP
+transporter.verify((error, success) => {
   if (error) {
-    console.error('SMTP configuration error:', error);
+    console.error('Erro na configuração SMTP:', error);
   } else {
-    console.log('SMTP server is ready to send emails');
+    console.log('Servidor SMTP pronto para envio');
   }
 });
 
-// Endpoint to receive quiz results
+// Endpoint para envio dos resultados do quiz
 app.post('/send-result', async (req, res) => {
   try {
     const { name, email, score, quizTitle } = req.body;
 
-    // Basic validation
+    // Validações básicas
     if (!name || name.length < 2) {
-      return res.status(400).json({ success: false, error: 'Invalid name' });
+      return res.status(400).json({ success: false, error: 'Nome inválido' });
     }
 
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!email || !emailRegex.test(email)) {
-      return res.status(400).json({ success: false, error: 'Invalid email' });
+      return res.status(400).json({ success: false, error: 'Email inválido' });
     }
 
-    if (!score) {
-      return res.status(400).json({ success: false, error: 'Score is required' });
-    }
-
-    if (!quizTitle) {
-      return res.status(400).json({ success: false, error: 'Quiz title is required' });
+    if (!score || !quizTitle) {
+      return res.status(400).json({ success: false, error: 'Pontuação e título do quiz são obrigatórios' });
     }
 
     const affiliateLink = 'https://nervovive24.com/text.php#aff=gabynos';
@@ -68,18 +64,16 @@ app.post('/send-result', async (req, res) => {
       <p>Best regards,<br>The NervoVive Team</p>
     `;
 
-    // Email to lead
     const mailToLead = {
-      from: `"NervoVive Team" <${process.env.EMAIL_USER}>`,
+      from: `"NervoVive Team" <${process.env.SMTP_USER}>`,
       to: email,
       subject: `Your Quiz Result - ${quizTitle}`,
       html: htmlContent,
     };
 
-    // Email to admin
     const mailToAdmin = {
-      from: `"NervoVive Quiz Notification" <${process.env.EMAIL_USER}>`,
-      to: process.env.EMAIL_USER,
+      from: `"NervoVive Quiz Notification" <${process.env.SMTP_USER}>`,
+      to: process.env.SMTP_USER,
       subject: `New quiz result from ${name}`,
       html: `
         <p><strong>Name:</strong> ${name}</p>
@@ -89,18 +83,16 @@ app.post('/send-result', async (req, res) => {
       `,
     };
 
-    // Send emails
     await transporter.sendMail(mailToLead);
     await transporter.sendMail(mailToAdmin);
 
-    return res.json({ success: true, message: 'Emails sent successfully' });
+    return res.json({ success: true, message: 'Emails enviados com sucesso' });
   } catch (error) {
-    console.error('Error sending email:', error);
-    return res.status(500).json({ success: false, error: 'Internal server error' });
+    console.error('Erro ao enviar email:', error);
+    return res.status(500).json({ success: false, error: 'Erro interno no servidor' });
   }
 });
 
-// Start server
 app.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
+  console.log(`Servidor rodando na porta ${PORT}`);
 });
