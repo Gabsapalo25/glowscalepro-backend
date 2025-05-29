@@ -1,98 +1,72 @@
 require('dotenv').config();
 const express = require('express');
-const cors = require('cors');
 const nodemailer = require('nodemailer');
+const bodyParser = require('body-parser');
+const cors = require('cors');
+const path = require('path');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// Middleware
+// Middlewares
 app.use(cors());
-app.use(express.json());
+app.use(bodyParser.json());
+app.use(express.static(path.join(__dirname, 'public')));
 
-// Configuração do Nodemailer com Zoho
+// Define transporter
+const isDev = process.env.NODE_ENV !== 'production';
+
 const transporter = nodemailer.createTransport({
   host: process.env.SMTP_HOST,
   port: parseInt(process.env.SMTP_PORT),
   secure: true,
   auth: {
     user: process.env.SMTP_USER,
-    pass: process.env.SMTP_PASS,
+    pass: process.env.SMTP_PASS
   },
-  tls: {
-    rejectUnauthorized: false, // Use apenas em ambiente de desenvolvimento
-  },
+  tls: isDev ? { rejectUnauthorized: false } : undefined
 });
 
-// Verifica a conexão com o servidor SMTP
+// Verifica conexão com SMTP
 transporter.verify((error, success) => {
   if (error) {
-    console.error('Erro na configuração SMTP:', error);
+    console.error('SMTP connection error:', error);
   } else {
-    console.log('Servidor SMTP pronto para envio');
+    console.log('SMTP server is ready to send emails');
   }
 });
 
-// Endpoint para envio dos resultados do quiz
+// Rota para envio do resultado
 app.post('/send-result', async (req, res) => {
-  try {
-    const { name, email, score, quizTitle } = req.body;
+  const { name, email, score, quizTitle } = req.body;
 
-    // Validações básicas
-    if (!name || name.length < 2) {
-      return res.status(400).json({ success: false, error: 'Nome inválido' });
-    }
+  if (!name || !email || typeof score === 'undefined' || !quizTitle) {
+    return res.status(400).json({ error: 'Missing required fields.' });
+  }
 
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!email || !emailRegex.test(email)) {
-      return res.status(400).json({ success: false, error: 'Email inválido' });
-    }
-
-    if (!score || !quizTitle) {
-      return res.status(400).json({ success: false, error: 'Pontuação e título do quiz são obrigatórios' });
-    }
-
-    const affiliateLink = 'https://nervovive24.com/text.php#aff=gabynos';
-
-    const htmlContent = `
+  const mailOptions = {
+    from: `"GlowscalePro" <${process.env.SMTP_USER}>`,
+    to: email,
+    subject: `Your Results for the ${quizTitle} Quiz`,
+    html: `
       <h2>Hi ${name},</h2>
-      <p>Thank you for completing the <strong>${quizTitle}</strong>.</p>
-      <p>Your quiz score: <strong>${score}</strong></p>
-      <p>Based on your score, we recommend taking the next step.</p>
-      <p><a href="${affiliateLink}" style="background:#007bff;color:#fff;padding:10px 15px;text-decoration:none;border-radius:5px;">Learn More About NervoVive</a></p>
-      <br>
-      <p>Best regards,<br>The NervoVive Team</p>
-    `;
+      <p>Thank you for taking the <strong>${quizTitle}</strong> quiz!</p>
+      <p>Your score: <strong>${score}</strong></p>
+      <p>We’ll be in touch with more insights soon.</p>
+    `
+  };
 
-    const mailToLead = {
-      from: `"NervoVive Team" <${process.env.SMTP_USER}>`,
-      to: email,
-      subject: `Your Quiz Result - ${quizTitle}`,
-      html: htmlContent,
-    };
-
-    const mailToAdmin = {
-      from: `"NervoVive Quiz Notification" <${process.env.SMTP_USER}>`,
-      to: process.env.SMTP_USER,
-      subject: `New quiz result from ${name}`,
-      html: `
-        <p><strong>Name:</strong> ${name}</p>
-        <p><strong>Email:</strong> ${email}</p>
-        <p><strong>Quiz:</strong> ${quizTitle}</p>
-        <p><strong>Score:</strong> ${score}</p>
-      `,
-    };
-
-    await transporter.sendMail(mailToLead);
-    await transporter.sendMail(mailToAdmin);
-
-    return res.json({ success: true, message: 'Emails enviados com sucesso' });
+  try {
+    await transporter.sendMail(mailOptions);
+    console.log(`Email sent to ${email}`);
+    res.status(200).json({ message: 'Result sent successfully!' });
   } catch (error) {
-    console.error('Erro ao enviar email:', error);
-    return res.status(500).json({ success: false, error: 'Erro interno no servidor' });
+    console.error('Error sending email:', error);
+    res.status(500).json({ error: 'Failed to send result.' });
   }
 });
 
+// Inicia servidor
 app.listen(PORT, () => {
-  console.log(`Servidor rodando na porta ${PORT}`);
+  console.log(`Server running on port ${PORT}`);
 });

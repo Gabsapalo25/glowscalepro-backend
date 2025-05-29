@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>NervoVive Quiz</title>
+  <link href="https://fonts.googleapis.com/css2?family=Open+Sans&display=swap" rel="stylesheet"/>
+  <style>
+    body {
+      font-family: 'Open Sans', sans-serif;
+      background-color: #f4f4f4;
+      margin: 0;
+      padding: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+    }
+    #quiz-container {
+      background-color: #fff;
+      padding: 2rem;
+      border-radius: 12px;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+      width: 100%;
+      max-width: 600px;
+    }
+    h1 {
+      font-size: 24px;
+      margin-bottom: 1rem;
+    }
+    .question {
+      margin-bottom: 1rem;
+    }
+    .answers button {
+      display: block;
+      width: 100%;
+      margin-bottom: 0.5rem;
+      padding: 0.5rem;
+      font-size: 16px;
+      cursor: pointer;
+      border: 1px solid #ccc;
+      border-radius: 8px;
+      background-color: #f9f9f9;
+    }
+    .answers button:hover {
+      background-color: #e0e0e0;
+    }
+    #result {
+      font-size: 18px;
+      font-weight: bold;
+      margin-top: 1rem;
+    }
+    input[type="email"] {
+      margin-top: 1rem;
+      padding: 0.5rem;
+      width: 100%;
+      border-radius: 6px;
+      border: 1px solid #ccc;
+    }
+    button#submit-email {
+      margin-top: 1rem;
+      background-color: #4CAF50;
+      color: white;
+      border: none;
+      padding: 0.5rem 1rem;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 16px;
+    }
+    button#submit-email:hover {
+      background-color: #45a049;
+    }
+  </style>
+</head>
+<body>
+  <div id="quiz-container">
+    <h1>NervoVive Quiz</h1>
+    <div id="quiz"></div>
+    <div id="result"></div>
+    <input type="email" id="email" placeholder="Enter your email" required />
+    <button id="submit-email">Submit</button>
+  </div>
+
+  <script>
+    const questions = [
+      {
+        question: "Você sente formigamento frequente nas extremidades?",
+        answers: ["Nunca", "Às vezes", "Frequentemente", "Sempre"],
+        scores: [0, 1, 2, 3]
+      },
+      {
+        question: "Você sente queimação ou dor nos pés à noite?",
+        answers: ["Nunca", "Às vezes", "Frequentemente", "Sempre"],
+        scores: [0, 1, 2, 3]
+      },
+      {
+        question: "Você sente dormência nas mãos ou pés?",
+        answers: ["Nunca", "Às vezes", "Frequentemente", "Sempre"],
+        scores: [0, 1, 2, 3]
+      }
+    ];
+
+    let currentQuestion = 0;
+    let score = 0;
+
+    function showQuestion() {
+      const q = questions[currentQuestion];
+      const quizDiv = document.getElementById('quiz');
+      quizDiv.innerHTML = `
+        <div class="question">${q.question}</div>
+        <div class="answers">
+          ${q.answers.map((answer, i) =>
+            `<button onclick="selectAnswer(${q.scores[i]})">${answer}</button>`
+          ).join('')}
+        </div>
+      `;
+    }
+
+    function selectAnswer(points) {
+      score += points;
+      currentQuestion++;
+      if (currentQuestion < questions.length) {
+        showQuestion();
+      } else {
+        showResult();
+      }
+    }
+
+    function showResult() {
+      document.getElementById('quiz').innerHTML = '';
+      document.getElementById('result').innerText = `Sua pontuação foi ${score}. Insira seu e-mail para receber o resultado.`;
+    }
+
+    document.getElementById('submit-email').addEventListener('click', () => {
+      const email = document.getElementById('email').value;
+      if (!email) {
+        alert('Por favor, insira um e-mail válido.');
+        return;
+      }
+
+      fetch('/send-result', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ email, score })
+      })
+      .then(res => res.json())
+      .then(data => {
+        alert('Resultado enviado com sucesso!');
+      })
+      .catch(err => {
+        console.error(err);
+        alert('Erro ao enviar o resultado.');
+      });
+    });
+
+    showQuestion();
+  </script>
+</body>
+</html>
