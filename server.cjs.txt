@@ -1,0 +1,277 @@
+require('dotenv').config();
+const express = require('express');
+const cors = require('cors');
+const nodemailer = require('nodemailer');
+const axios = require('axios');
+const pino = require('pino');
+const helmet = require('helmet');
+const rateLimit = require('express-rate-limit');
+const envalid = require('envalid');
+const sanitizeHtml = require('sanitize-html');
+const fs = require('fs').promises;
+const path = require('path');
+const { fileURLToPath } = require('url');
+const { dirname, join } = path;
+
+// Middlewares customizados
+const csrfMiddleware = require('./middleware/csrfMiddleware');
+const validateQuizPayload = require('./middleware/validateQuizPayload');
+const authMiddleware = require('./middleware/authMiddleware');
+const loggerMiddleware = require('./middleware/loggerMiddleware');
+
+// Configurar ambiente
+const env = envalid.cleanEnv(process.env, {
+  PORT: envalid.port({ default: 10000 }),
+  NODE_ENV: envalid.str({ choices: ['development', 'production', 'test'], default: 'development' }),
+  FRONTEND_URL: envalid.url(),
+  SMTP_HOST: envalid.str(),
+  SMTP_PORT: envalid.port(),
+  SMTP_SECURE: envalid.bool(),
+  SMTP_USER: envalid.str(),
+  SMTP_PASS: envalid.str(),
+  SMTP_TLS_REJECT_UNAUTHORIZED: envalid.bool(),
+  ACTIVE_CAMPAIGN_API_URL: envalid.url({ default: '' }),
+  ACTIVE_CAMPAIGN_API_KEY: envalid.str({ default: '' }),
+  ADMIN_EMAIL: envalid.str({ default: '' }),
+  LOG_LEVEL: envalid.str({ default: 'info' }),
+  SRC_SECRET: envalid.str({ default: 'm3Jvgl0pExEMKDfSk7PVuAdxzi8wvZ6X' })
+});
+
+// Inicializar servidor
+const app = express();
+const logger = pino({ level: env.LOG_LEVEL });
+
+// Obter __dirname em CommonJS
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+
+// Caminho absoluto para data.json
+const dataFilePath = join(__dirname, 'config', 'data.json');
+
+let data, quizzesConfig;
+
+try {
+  const fileContent = await fs.readFile(dataFilePath, 'utf-8');
+  data = JSON.parse(fileContent);
+
+  // Importar funções de template
+  const templates = require('./services/email/templates');
+  const {
+    generateNervoViveEmailContent,
+    generatePrimebiomeEmailContent,
+    generateProdentimEmailContent,
+    generateTokmateEmailContent,
+    generateTotalControl24EmailContent,
+    generateGlucoShieldEmailContent,
+    generateProstadineEmailContent
+  } = templates;
+
+  // Configurar quizzes
+  quizzesConfig = data.quizzesConfig.map(quiz => {
+    // Validação de campos obrigatórios
+    if (!quiz.quizId || !quiz.emailTemplate) {
+      logger.warn(`⚠️ Quiz incompleto: ${JSON.stringify(quiz)}`);
+      return {
+        ...quiz,
+        generateEmailContent: () => '<div>Configuração inválida</div>'
+      };
+    }
+
+    // Mapear templates
+    switch (quiz.emailTemplate) {
+      case 'nervovive':
+        quiz.generateEmailContent = generateNervoViveEmailContent;
+        break;
+      case 'tokmate':
+        quiz.generateEmailContent = generateTokmateEmailContent;
+        break;
+      case 'primebiome':
+        quiz.generateEmailContent = generatePrimebiomeEmailContent;
+        break;
+      case 'totalcontrol24':
+        quiz.generateEmailContent = generateTotalControl24EmailContent;
+        break;
+      case 'glucoshield':
+        quiz.generateEmailContent = generateGlucoShieldEmailContent;
+        break;
+      case 'prostadine':
+        quiz.generateEmailContent = generateProstadineEmailContent;
+        break;
+      default:
+        logger.warn(`⚠️ Template de e-mail não encontrado para: ${quiz.emailTemplate}`);
+        quiz.generateEmailContent = ({ name, score, total, affiliateLink }) => {
+          const sanitizedName = sanitizeHtml(name);
+          return `
+            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+              <h2 style="color: #333;">Hello, ${sanitizedName}!</h2>
+              <p style="color: #555;">Your quiz score: ${score}/${total}</p>
+              <p style="color: #555;">Learn more: <a href="${affiliateLink}" style="color: #007BFF; text-decoration: none;">Click here</a></p>
+            </div>
+          `;
+        };
+    }
+    return quiz;
+  });
+} catch (err) {
+  logger.error({ error: err.message }, `❌ Erro ao ler arquivo JSON em ${dataFilePath}`);
+  process.exit(1);
+}
+
+// Middlewares globais
+app.use(loggerMiddleware);
+app.use(helmet());
+app.use(express.json());
+app.disable('x-powered-by');
+
+// CORS
+app.use(cors({
+  origin: env.FRONTEND_URL,
+  credentials: true,
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-CSRF-Token']
+}));
+
+// Rate Limiting
+const apiLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 100,
+  message: { error: 'Too many requests. Please try again later.' }
+});
+app.use('/send-result', apiLimiter);
+
+// Configuração do Nodemailer
+const transporter = nodemailer.createTransport({
+  host: env.SMTP_HOST,
+  port: env.SMTP_PORT,
+  secure: env.SMTP_SECURE,
+  auth: {
+    user: env.SMTP_USER,
+    pass: env.SMTP_PASS
+  },
+  tls: {
+    rejectUnauthorized: env.SMTP_TLS_REJECT_UNAUTHORIZED
+  }
+});
+
+// Rota principal de envio
+app.post('/send-result', csrfMiddleware.csrfProtection, validateQuizPayload, async (req, res) => {
+  try {
+    const { name, email, score, total, quizId, countryCode, whatsapp, q4, consent } = req.body;
+
+    // Sanitização de entradas
+    const sanitizedName = sanitizeHtml(name);
+    const sanitizedEmail = sanitizeHtml(email);
+    const sanitizedQ4 = sanitizeHtml(q4);
+
+    // Buscar configuração do quiz
+    const quizConfig = quizzesConfig.find(q => q.quizId === quizId);
+    if (!quizConfig) {
+      logger.warn(`❌ Quiz não encontrado: ${quizId}`);
+      return res.status(400).json({ error: 'Quiz inválido.' });
+    }
+
+    // Enviar e-mail ao lead
+    try {
+      await transporter.sendMail({
+        from: `"GlowscalePro" <${env.SMTP_USER}>`,
+        to: sanitizedEmail,
+        subject: quizConfig.subject,
+        html: quizConfig.generateEmailContent({ 
+          name: sanitizedName, 
+          score, 
+          total, 
+          affiliateLink: quizConfig.affiliateLink 
+        })
+      });
+    } catch (userEmailError) {
+      logger.error({ error: userEmailError.message }, 'Falha ao enviar e-mail ao lead');
+      return res.status(500).json({ error: 'Falha ao enviar e-mail ao usuário.' });
+    }
+
+    // Notificar admin (se configurado)
+    if (env.ADMIN_EMAIL) {
+      const adminHtml = `
+        <div>
+          <h2>New quiz result received</h2>
+          <p><strong>Quiz:</strong> ${quizConfig.quizTitle}</p>
+          <p><strong>Name:</strong> ${sanitizedName}</p>
+          <p><strong>Email:</strong> ${sanitizedEmail}</p>
+          <p><strong>WhatsApp:</strong> +${countryCode || ''}${whatsapp || 'Not provided'}</p>
+          <p><strong>Score:</strong> ${score} / ${total}</p>
+          <p><strong>Key insight (Q4):</strong> ${sanitizedQ4}</p>
+          <p><strong>Consent:</strong> ${consent ? 'Yes' : 'No'}</p>
+          <p><strong>Affiliate Link:</strong> ${quizConfig.affiliateLink}</p>
+        </div>
+      `;
+      transporter.sendMail({
+        from: `"GlowscalePro" <${env.SMTP_USER}>`,
+        to: env.ADMIN_EMAIL,
+        subject: `New ${quizConfig.quizTitle} submission`,
+        html: adminHtml
+      }).catch(adminEmailError => {
+        logger.warn({ error: adminEmailError.message }, 'Erro ao notificar admin');
+      });
+    }
+
+    // Integração com ActiveCampaign
+    if (consent && env.ACTIVE_CAMPAIGN_API_KEY && env.ACTIVE_CAMPAIGN_API_URL) {
+      const [firstName, ...rest] = sanitizedName.split(' ');
+      const lastName = rest.join(' ');
+
+      try {
+        await axios.post(
+          `${env.ACTIVE_CAMPAIGN_API_URL}/api/3/contacts`,
+          {
+            contact: {
+              email: sanitizedEmail,
+              first_name: firstName,
+              last_name: lastName,
+              fieldValues: [
+                { field: quizConfig.activeCampaignFields.scoreFieldId, value: `${score}/${total}` },
+                { field: quizConfig.activeCampaignFields.q4FieldId, value: sanitizedQ4 },
+                { field: quizConfig.activeCampaignFields.whatsappFieldId, value: `${countryCode}${whatsapp || ''}` }
+              ],
+              lists: [{ list: quizConfig.activeCampaignFields.listId, status: 1 }],
+              tags: [quizConfig.leadTag]
+            }
+          },
+          {
+            headers: {
+              'Api-Token': env.ACTIVE_CAMPAIGN_API_KEY,
+              'Content-Type': 'application/json'
+            }
+          }
+        );
+      } catch (acError) {
+        logger.error({ error: acError.message, stack: acError.stack }, 'Falha crítica na integração com ActiveCampaign');
+        return res.status(500).json({ error: 'Erro ao integrar com ActiveCampaign.' });
+      }
+    }
+
+    logger.info(`✅ Resultado enviado para ${sanitizedEmail}`);
+    res.status(200).json({ message: 'Resultado enviado com sucesso.' });
+  } catch (error) {
+    logger.error({ error: error.message, stack: error.stack }, '❌ Erro inesperado');
+    res.status(500).json({ error: 'Erro interno no servidor.' });
+  }
+});
+
+// Geração de token CSRF
+app.get('/api/csrf-token', loggerMiddleware, csrfMiddleware.generateCsrfToken);
+
+// Iniciar servidor
+const server = app.listen(env.PORT, () => {
+  logger.info(`🚀 Servidor rodando na porta ${env.PORT}`);
+  logger.info(`🌱 Ambiente: ${env.NODE_ENV}`);
+  logger.info(`🔗 Origem permitida: ${env.FRONTEND_URL}`);
+});
+
+// Desligamento gracioso
+process.on('SIGTERM', () => {
+  logger.info('SIGTERM recebido. Fechando servidor...');
+  server.close(() => {
+    logger.info('Servidor fechado.');
+    process.exit(0);
+  });
+});
+
+module.exports = { app, server };
