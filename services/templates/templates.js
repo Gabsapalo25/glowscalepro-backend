@@ -16,7 +16,7 @@ const generateBaseEmail = (data, customContent) => {
       padding: 0;
     }
     .container {
-      max-width: 600px;
+      max-width: 100px;
       margin: 20px auto;
       background: #ffffff;
       border-radius: 10px;
