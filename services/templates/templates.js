@@ -36,9 +36,9 @@ const generateBaseEmail = (data, customContent) => {
       padding: 10px 0;
     }
     .brand-logo {
-      height: 40px;
+      height: 18px;
       width: auto;
-      max-width: 150px;
+      max-width: 68px;
       object-fit: contain;
     }
     .content {
