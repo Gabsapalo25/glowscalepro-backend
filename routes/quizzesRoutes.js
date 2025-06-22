@@ -30,5 +30,4 @@ router.post('/submit-quiz', async (req, res) => {
     }
 });
 
-// Exportação padrão para compatibilidade com index.js
 export default router;
