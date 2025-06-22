@@ -1,4 +1,4 @@
-// quizzesConfig.js — COMPLETO e ATUALIZADO
+// config/quizzesConfig.js — COMPLETO e ATUALIZADO (Sua Versão)
 
 import {
   generateTokmateEmailContent,
@@ -8,10 +8,8 @@ import {
   generateTotalControlEmailContent,
   generateGlucoShieldEmailContent,
   generateProstadineEmailContent
-} from "../services/templates/templates.js";
+} from "../services/templates/templates.js"; // Caminho corrigido para templates.js
 
-// Importante: Esta exportação é um array diretamente, e não um objeto com uma propriedade 'quizzes'.
-// O 'index.js' precisará importá-lo como 'quizzesConfig' e iterar diretamente sobre ele.
 export const quizzesConfig = [
   {
     quizId: "tokmate",
@@ -20,7 +18,7 @@ export const quizzesConfig = [
     ctaColor: "#f59e0b",
     ctaText: "Start Growing on TikTok",
     subject: "Your TokMate Quiz Results",
-    leadTag: "tokmate_lead",
+    leadTag: "tokmate_lead", // Lembre-se, este deve ser o ID numérico da tag no AC
     activeCampaignFields: {
       scoreFieldId: "1",
       q4FieldId: "2",

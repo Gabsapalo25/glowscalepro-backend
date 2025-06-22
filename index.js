@@ -1,15 +1,20 @@
-// src/index.js - VERSÃO COMPLETA E FINAL (CORRIGIDA)
+// index.js - VERSÃO FINAL E CORRIGIDA
 import express from 'express';
 import bodyParser from 'body-parser';
 import cors from 'cors';
-import { cleanEnv, str, num } from 'envalid';
+import { cleanEnv, str, num, bool } from 'envalid'; // Adicionado 'bool' para SMTP_SECURE e SMTP_TLS_REJECT_UNAUTHORIZED
 import dotenv from 'dotenv';
 import pino from 'pino';
-import quizzesRoutes from './routes/quizzesRoutes.js';
-import mailRoutes from './routes/mailRoutes.js';
-import unsubscribeRoutes from './routes/unsubscribeRoutes.js';
+
+// Importações com caminhos corrigidos para a sua estrutura original (raiz do projeto)
+import quizRoutes from './routes/quizRoutes.js'; 
+// Se você tem mailRoutes e unsubscribeRoutes e eles não estão consolidados em quizRoutes:
+// import mailRoutes from './routes/mailRoutes.js';
+// import unsubscribeRoutes from './routes/unsubscribeRoutes.js';
+
 import activeCampaignService from './services/activeCampaignService.js';
-import { quizzesConfig } from './config/quizzesConfig.js'; // Correção: importação de export nomeado
+import sendEmail from './services/emailService.js'; // Importa a função default do seu emailService
+import { quizzesConfig } from './config/quizzesConfig.js'; 
 
 dotenv.config();
 
@@ -25,19 +30,22 @@ const env = cleanEnv(process.env, {
     NODE_ENV: str({ devDefault: 'development' }),
     FRONTEND_URL: str({ devDefault: 'http://localhost:3001' }),
     ALLOWED_ORIGINS: str({ devDefault: 'http://localhost:3001' }),
+
     ADMIN_EMAIL: str(),
     SMTP_HOST: str(),
     SMTP_PORT: num(),
     SMTP_USER: str(),
     SMTP_PASS: str(),
-    SMTP_SECURE: str({ devDefault: 'false' }),
-    SMTP_TLS_REJECT_UNAUTHORIZED: str({ devDefault: 'true' }),
+    SMTP_SECURE: bool(), // Usando bool para 'secure'
+    SMTP_TLS_REJECT_UNAUTHORIZED: bool(), // Usando bool para 'rejectUnauthorized'
+
     ACTIVE_CAMPAIGN_API_URL: str(),
     ACTIVE_CAMPAIGN_API_KEY: str(),
-    AC_LIST_ID_MASTERTOOLS_ALL: num(),
-    UNSUBSCRIBE_TAG_ID: num(),
+    AC_LIST_ID_MASTERTOOLS_ALL: num(), 
+    UNSUBSCRIBE_TAG_ID: num(), 
 });
 
+// Configuração do Express e Middlewares
 app.use(bodyParser.json());
 
 const allowedOrigins = env.ALLOWED_ORIGINS.split(',').map(origin => origin.trim());
@@ -57,34 +65,30 @@ app.use(cors({
 }));
 
 app.use((req, res, next) => {
+    // Passa variáveis de ambiente para `req.app.locals` para fácil acesso nas rotas/serviços
     req.app.locals.acApiUrl = env.ACTIVE_CAMPAIGN_API_URL;
     req.app.locals.acApiKey = env.ACTIVE_CAMPAIGN_API_KEY;
     req.app.locals.acListIdMastertoolsAll = env.AC_LIST_ID_MASTERTOOLS_ALL;
     req.app.locals.acTagIdUnsubscribe = env.UNSUBSCRIBE_TAG_ID;
     req.app.locals.adminEmail = env.ADMIN_EMAIL;
-    req.app.locals.smtpConfig = {
-        host: env.SMTP_HOST,
-        port: env.SMTP_PORT,
-        secure: env.SMTP_SECURE === 'true',
-        auth: {
-            user: env.SMTP_USER,
-            pass: env.SMTP_PASS,
-        },
-        tls: {
-            rejectUnauthorized: env.SMTP_TLS_REJECT_UNAUTHORIZED === 'true'
-        }
-    };
+    // req.app.locals.smtpConfig não é mais necessário aqui, pois emailService gerencia internamente
     next();
 });
 
-app.use('/api', quizzesRoutes);
-app.use('/api', mailRoutes);
-app.use('/api', unsubscribeRoutes);
+// Definição de Rotas
+app.use('/api', quizRoutes); 
+// Se você tiver mailRoutes e unsubscribeRoutes separadas e ativas:
+// app.use('/api', mailRoutes);
+// app.use('/api', unsubscribeRoutes);
 
 app.get('/', (req, res) => {
     res.send('API is running!');
 });
 
+// Tratamento de Erros Global (se você tiver um middleware de errorHandler.js, você o usaria aqui)
+// app.use(errorHandler); // Exemplo de uso se você tiver o middleware
+
+// Inicialização do Servidor
 const PORT = env.PORT;
 
 app.listen(PORT, async () => {
@@ -92,29 +96,23 @@ app.listen(PORT, async () => {
     logger.info(`🚀 Servidor rodando na porta ${PORT}`);
     logger.info(`🌎 Ambiente: ${env.NODE_ENV}`);
     logger.info(`🔗 Frontend: ${env.FRONTEND_URL}`);
-    logger.info(`✉️ SMTP: ${env.SMTP_USER}@${env.SMTP_HOST}`);
-
-    try {
-        const nodemailer = await import('nodemailer');
-        const testTransporter = nodemailer.createTransport(app.locals.smtpConfig);
-        await testTransporter.verify();
-        logger.info('✅ Conexão SMTP verificada com sucesso.');
-    } catch (error) {
-        logger.error(`❌ Erro ao verificar conexão SMTP: ${error.message}`);
-        logger.error(`Detalhes da configuração SMTP: Host=${env.SMTP_HOST}, Port=${env.SMTP_PORT}, User=${env.SMTP_USER}`);
-    }
-
+    logger.info(`✉️ Email Admin: ${env.ADMIN_EMAIL}`);
+    // A verificação SMTP é feita dentro do emailService.js, então não precisamos de um bloco aqui.
+    
+    // Logs da Configuração do ActiveCampaign
     logger.info(`📊 ActiveCampaign: ${env.ACTIVE_CAMPAIGN_API_KEY ? 'Ativo' : 'Inativo'}`);
     logger.info(`   - API URL: ${env.ACTIVE_CAMPAIGN_API_URL}`);
     logger.info(`   - MasterTools List ID: ${env.AC_LIST_ID_MASTERTOOLS_ALL}`);
     logger.info(`   - Unsubscribe Tag ID: ${env.UNSUBSCRIBE_TAG_ID}`);
 
-    logger.info('✅ Quizzes carregados:');
-    if (quizzesConfig && Array.isArray(quizzesConfig)) {
+    // Carregamento e Log dos Quizzes
+    logger.info(`✅ Quizzes carregados:`);
+    if (quizzesConfig && Array.isArray(quizzesConfig) && quizzesConfig.length > 0) {
         quizzesConfig.forEach(quiz => {
-            logger.info(`- ${quiz.quizId}: ${quiz.subject} (List ID: ${quiz.activeCampaignFields ? quiz.activeCampaignFields.scoreFieldId : 'Indefinido'})`);
+            logger.info(`- ${quiz.quizId || 'ID Indefinido'}: ${quiz.subject || 'Assunto Indefinido'}`);
         });
     } else {
-        logger.warn('- Nenhuma configuração de quiz encontrada ou estrutura inválida.');
+        logger.warn(`- Nenhuma configuração de quiz encontrada em config/quizzesConfig.js ou estrutura inválida.`);
+        logger.warn(`- Por favor, verifique se 'quizzesConfig' é um array de objetos válidos.`);
     }
 });

@@ -1,3 +1,4 @@
+// services/emailService.js
 import nodemailer from 'nodemailer';
 import pino from 'pino';
 import { cleanEnv, str, port, bool } from 'envalid';
@@ -38,8 +39,8 @@ transporter.verify((error) => {
   }
 });
 
-// Função para enviar e-mail
-export const sendEmail = async ({ to, subject, html, text }) => {
+// Função para enviar e-mail (AGORA COM EXPORTAÇÃO DEFAULT)
+export const sendEmail = async ({ to, subject, html, text }) => { // Mantenha sendEmail como um export nomeado para consistência
   try {
     const mailOptions = {
       from: `"GlowscalePro" <${env.SMTP_USER}>`,
@@ -60,3 +61,6 @@ export const sendEmail = async ({ to, subject, html, text }) => {
     throw new Error(`Email sending failed: ${error.message}`);
   }
 };
+
+// Exporta sendEmail como default
+export default sendEmail; // <-- ESTA É A MUDANÇA MAIS IMPORTANTE AQUI
