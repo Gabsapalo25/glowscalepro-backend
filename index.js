@@ -6,7 +6,11 @@ import nodemailer from 'nodemailer';
 import winston from 'winston';
 import activeCampaignService from './services/activeCampaignService.js';
 import quizConfigs from './config/quizzesConfig.js';
-import dataConfig from './config/data.json' assert { type: 'json' };
+// Importação atualizada para data.json
+import { createRequire } from 'module';
+const require = createRequire(import.meta.url);
+const dataConfig = require('./config/data.json');
+
 
 dotenv.config();
 
