@@ -1,39 +1,43 @@
 import axios from 'axios';
 import dotenv from 'dotenv';
-// CORREÇÃO AQUI: Importa cleanEnv, str e num diretamente do envalid.
-// Isso usa a API recomendada para versões mais recentes do envalid,
-// eliminando a necessidade de importar Joi separadamente.
 import { cleanEnv, str, num } from 'envalid';
 import pino from 'pino';
 
 dotenv.config();
 
-// Configuração do logger pino
 const logger = pino({
     level: process.env.PINO_LOG_LEVEL || 'info',
-    // Não usamos transport: pino-pretty em produção no Render para evitar erros,
-    // os logs serão em JSON e o console do Render os formata.
-    // transport: {
-    //     target: 'pino-pretty',
-    //     options: {
-    //         colorize: true,
-    //         ignore: 'pid,hostname',
-    //     },
-    // },
 });
 
 // Validação e limpeza das variáveis de ambiente usando envalid
-// Usando cleanEnv e os validadores internos do envalid (str, num)
+// CORREÇÃO AQUI: Os nomes das chaves agora correspondem EXATAMENTE aos nomes no Render.
 const env = cleanEnv(process.env, {
-    AC_API_URL: str({ devDefault: 'https://your-activecampaign-dev-url.com' }), // Adicione um valor padrão para desenvolvimento
-    AC_API_KEY: str({ devDefault: 'YOUR_DEV_ACTIVE_CAMPAIGN_API_KEY' }), // Adicione um valor padrão para desenvolvimento
-    AC_LIST_ID_MASTERTOOLS_ALL: num({ devDefault: 12345 }), // Use num() para números, e um default válido para desenvolvimento
-    AC_TAG_ID_UNSUBSCRIBE: num({ devDefault: 67890 }), // Use num() para números, e um default válido para desenvolvimento
-    // Adicione outras variáveis de ambiente se houver
+    // Mapeia para ACTIVE_CAMPAIGN_API_URL no Render
+    ACTIVE_CAMPAIGN_API_URL: str({ devDefault: 'https://your-activecampaign-dev-url.com' }), 
+    // Mapeia para ACTIVE_CAMPAIGN_API_KEY no Render
+    ACTIVE_CAMPAIGN_API_KEY: str({ devDefault: 'YOUR_DEV_ACTIVE_CAMPAIGN_API_KEY' }), 
+    // Esta variável (AC_LIST_ID_MASTERTOOLS_ALL) não foi listada no seu print do Render.
+    // VOCÊ PRECISARÁ ADICIONÁ-LA NO RENDER OU AJUSTAR O NOME AQUI SE JÁ EXISTIR LÁ.
+    // Por enquanto, vou deixá-la como está no seu código original, mas ela será "undefined" se não estiver no Render.
+    AC_LIST_ID_MASTERTOOLS_ALL: num({ devDefault: 12345 }), 
+    // Mapeia para UNSUBSCRIBE_TAG_ID no Render
+    UNSUBSCRIBE_TAG_ID: num({ devDefault: 67890 }), 
+    // Adicione outras variáveis de ambiente se houver e quiser validá-las aqui
 });
 
-const acApiUrl = env.AC_API_URL;
-const acApiKey = env.AC_API_KEY;
+// As variáveis locais agora usam os nomes validados do 'env' que correspondem ao Render.
+const acApiUrl = env.ACTIVE_CAMPAIGN_API_URL;
+const acApiKey = env.ACTIVE_CAMPAIGN_API_KEY;
+
+// No service, ao invés de AC_LIST_ID_MASTERTOOLS_ALL e AC_TAG_ID_UNSUBSCRIBE,
+// vamos usar diretamente as do 'env' mapeadas para os nomes do Render.
+// Você precisará atualizar quaisquer chamadas que usem essas variáveis em outros lugares
+// para usar env.AC_LIST_ID_MASTERTOOLS_ALL e env.UNSUBSCRIBE_TAG_ID.
+// Ou, para manter a clareza e evitar alterar outras partes do código,
+// podemos mapeá-las de volta para os nomes originais aqui:
+const acListIdMastertoolsAll = env.AC_LIST_ID_MASTERTOOLS_ALL; // Esta linha dependerá de você ter esta variável no Render
+const acTagIdUnsubscribe = env.UNSUBSCRIBE_TAG_ID;
+
 
 const headers = {
     'Api-Token': acApiKey,
@@ -82,12 +86,11 @@ const activeCampaignService = {
             logger.info(`Contact with email ${email} not found.`);
             return null;
         } catch (error) {
-            // Se o erro for um 404 (não encontrado) ou similar, retorna null em vez de lançar
             if (error.response && error.response.status === 404) {
                 logger.info(`Contact with email ${email} not found (404 response).`);
                 return null;
             }
-            throw error; // Lança outros erros
+            throw error;
         }
     },
 
@@ -104,9 +107,8 @@ const activeCampaignService = {
             const contactId = response.contact.id;
             logger.info(`Contact created/updated: ${contactId}`);
 
-            // Adiciona o contato à lista, se ainda não estiver
             const contactListStatus = await activeCampaignService.getContactListStatus(contactId, listId);
-            if (!contactListStatus || contactListStatus.status !== '1') { // 1 = subscribed
+            if (!contactListStatus || contactListStatus.status !== '1') {
                 logger.info(`Adding contact ${contactId} to list ${listId}.`);
                 await activeCampaignService.addContactToList(contactId, listId);
             } else {
@@ -115,13 +117,11 @@ const activeCampaignService = {
             return contactId;
 
         } catch (error) {
-            // Se o erro for "Contact already exists", tenta encontrar e atualizar
             if (error.response && error.response.data.errors && error.response.data.errors[0].code === 'api_contact_duplicate_email') {
                 logger.warn(`Duplicate email when creating contact ${email}. Attempting to find existing contact.`);
                 const existingContactId = await activeCampaignService.findContactByEmail(email);
                 if (existingContactId) {
                     logger.info(`Found existing contact ${existingContactId} for email ${email}.`);
-                    // Garante que o contato está na lista correta
                     const contactListStatus = await activeCampaignService.getContactListStatus(existingContactId, listId);
                     if (!contactListStatus || contactListStatus.status !== '1') {
                         logger.info(`Adding existing contact ${existingContactId} to list ${listId}.`);
@@ -132,7 +132,7 @@ const activeCampaignService = {
                     return existingContactId;
                 }
             }
-            throw error; // Lança outros erros
+            throw error;
         }
     },
 
@@ -142,7 +142,7 @@ const activeCampaignService = {
             contactList: {
                 list: listId,
                 contact: contactId,
-                status: 1 // 1 = subscribed
+                status: 1
             }
         };
         try {
@@ -212,15 +212,12 @@ const activeCampaignService = {
 
         try {
             for (const fieldValue of fieldValues) {
-                // Tenta encontrar o valor do campo personalizado existente para este contato
                 const existingFieldResponse = await callActiveCampaign('get', `/api/3/fieldValues?contact=${contactId}&field=${fieldValue.field}`);
                 if (existingFieldResponse && existingFieldResponse.fieldValues && existingFieldResponse.fieldValues.length > 0) {
-                    // Se existe, atualiza
                     const fieldId = existingFieldResponse.fieldValues[0].id;
                     await callActiveCampaign('put', `/api/3/fieldValues/${fieldId}`, { fieldValue: fieldValue });
                     logger.info(`Updated custom field ${fieldValue.field} for contact ${contactId}.`);
                 } else {
-                    // Se não existe, cria
                     await callActiveCampaign('post', '/api/3/fieldValues', { fieldValue: fieldValue });
                     logger.info(`Created custom field ${fieldValue.field} for contact ${contactId}.`);
                 }
@@ -238,7 +235,7 @@ const activeCampaignService = {
         try {
             const response = await callActiveCampaign('get', `/api/3/contactLists?contact=${contactId}&list=${listId}`);
             if (response && response.contactLists && response.contactLists.length > 0) {
-                return response.contactLists[0]; // Retorna o objeto contactList
+                return response.contactLists[0];
             }
             return null;
         } catch (error) {
@@ -248,5 +245,4 @@ const activeCampaignService = {
     }
 };
 
-// Exporta o serviço como um módulo padrão (default export)
 export default activeCampaignService;
