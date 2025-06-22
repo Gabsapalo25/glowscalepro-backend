@@ -1,8 +1,8 @@
-// config/quizzesConfig.js - VERSÃO PROFISSIONAL FINAL
+// config/quizzesConfig.js - VERSÃO FINAL E COMPLETA
 
-// Importa o módulo 'templates' usando a exportação padrão (default export).
-// Certifique-se de que '../services/templates/templates.js' exporta 'templates' como 'export default templates;'.
-import templates from '../services/templates/templates.js'; 
+// Importa o objeto 'templates' como um named import.
+// Isso assume que '../services/templates/templates.js' tem 'export const templates = { ... };'
+import { templates } from '../services/templates/templates.js'; 
 
 export const quizzesConfig = [
   {
@@ -14,11 +14,11 @@ export const quizzesConfig = [
     // ID numérico da tag "tokmate_lead" no ActiveCampaign (confirmado: tagid=10)
     leadTag: 10, 
     activeCampaignFields: {
-      // Importante: Estes IDs devem ser os IDs numéricos dos seus campos personalizados no ActiveCampaign.
-      // Valide-os na sua conta ActiveCampaign em 'Contatos > Gerenciar Campos'.
-      scoreFieldId: "1", 
-      q4FieldId: "2",    
-      whatsappFieldId: "3", 
+      // ATENÇÃO: Estes IDs DEVEM ser os IDs numéricos REAIS dos seus campos personalizados no ActiveCampaign.
+      // Você pode verificá-los em 'Contatos > Gerenciar Campos' na sua conta ActiveCampaign.
+      scoreFieldId: "1", // Exemplo: ID do campo para a pontuação
+      q4FieldId: "2",    // Exemplo: ID do campo para a resposta da Q4
+      whatsappFieldId: "3", // Exemplo: ID do campo para o WhatsApp
     },
     emailTemplateFunction: templates.tokmateEmailTemplate,
   },
@@ -104,7 +104,7 @@ export const quizzesConfig = [
     ctaText: "Support Your Prostate Health",
     subject: "Your Prostadine Quiz Results",
     // ID numérico TEMPORÁRIO da tag "prostadine_lead" no ActiveCampaign.
-    // VOCÊ DEVE VERIFICAR O ID REAL DESSA TAG NO ACTIVE CAMPAIGN E ATUALIZAR ESTE VALOR.
+    // LEMBRE-SE: ESTE VALOR DEVE SER ATUALIZADO COM O ID REAL ASSIM QUE VOCÊ O ENCONTRAR NO ACTIVE CAMPAIGN!
     leadTag: 14, 
     activeCampaignFields: {
       scoreFieldId: "19", 
