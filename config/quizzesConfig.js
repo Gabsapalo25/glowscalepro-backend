@@ -1,112 +1,94 @@
-// config/quizzesConfig.js — COMPLETO e ATUALIZADO (Sua Versão)
-
-import {
-  generateTokmateEmailContent,
-  generatePrimeBiomeEmailContent,
-  generateProdentimEmailContent,
-  generateNervoViveEmailContent,
-  generateTotalControlEmailContent,
-  generateGlucoShieldEmailContent,
-  generateProstadineEmailContent
-} from "../services/templates/templates.js"; // Caminho corrigido para templates.js
+// config/quizzesConfig.js
+import { templates } from '../services/templates/templates.js'; // Certifique-se de que o caminho está correto
 
 export const quizzesConfig = [
   {
     quizId: "tokmate",
-    emailTemplateFunction: generateTokmateEmailContent,
     affiliateLink: "https://get.tokmate.com/?aid=1743057",
     ctaColor: "#f59e0b",
     ctaText: "Start Growing on TikTok",
     subject: "Your TokMate Quiz Results",
-    leadTag: "tokmate_lead", // Lembre-se, este deve ser o ID numérico da tag no AC
+    leadTag: 10, // Confirmed from your URL: tagid=10
+    // listId: 5, // OPCIONAL: Se todos os quizzes vão para a mesma lista principal (ID 5), não precisa repetir isso em cada quiz.
+                 // Seu quizRoutes.js já usa req.app.locals.acListIdMastertoolsAll por padrão.
     activeCampaignFields: {
-      scoreFieldId: "1",
+      scoreFieldId: "1", 
       q4FieldId: "2",
-      whatsappFieldId: "3"
-    }
+      whatsappFieldId: "3",
+    },
+    emailTemplateFunction: templates.tokmateEmailTemplate,
   },
   {
     quizId: "primebiome",
-    emailTemplateFunction: generatePrimeBiomeEmailContent,
-    affiliateLink: "https://primebiome24.com/text.php#aff=gabynos",
-    ctaColor: "#27ae60",
-    ctaText: "Restore Your Gut Health",
-    subject: "Your PrimeBiome Quiz Results",
-    leadTag: "primebiome_lead",
+    // ... outros campos ...
+    leadTag: 11, // Confirmed from your URL: tagid=11
+    // listId: 5, // OPCIONAL
     activeCampaignFields: {
-      scoreFieldId: "1",
-      q4FieldId: "2",
-      whatsappFieldId: "3"
-    }
+        scoreFieldId: "4", 
+        q4FieldId: "5",
+        whatsappFieldId: "6",
+    },
+    emailTemplateFunction: templates.primeBiomeEmailTemplate,
   },
   {
     quizId: "prodentim",
-    emailTemplateFunction: generateProdentimEmailContent,
-    affiliateLink: "https://prodentim24.com/text.php#aff=gabynos",
-    ctaColor: "#3498db",
-    ctaText: "Improve Oral Health",
-    subject: "Your ProDentim Quiz Results",
-    leadTag: "prodentim_lead",
+    // ... outros campos ...
+    leadTag: 12, // Confirmed from your URL: tagid=12
+    // listId: 5, // OPCIONAL
     activeCampaignFields: {
-      scoreFieldId: "1",
-      q4FieldId: "2",
-      whatsappFieldId: "3"
-    }
+        scoreFieldId: "7", 
+        q4FieldId: "8",
+        whatsappFieldId: "9",
+    },
+    emailTemplateFunction: templates.prodentimEmailTemplate,
   },
   {
     quizId: "nervovive",
-    emailTemplateFunction: generateNervoViveEmailContent,
-    affiliateLink: "https://nervovive24.com/text.php#aff=gabynos",
-    ctaColor: "#9b59b6",
-    ctaText: "Soothe Nerve Discomfort",
-    subject: "Your NervoVive Quiz Results",
-    leadTag: "nervovive_lead",
+    // ... outros campos ...
+    leadTag: 1, // Confirmed from your URL: tagid=1
+    // listId: 5, // OPCIONAL
     activeCampaignFields: {
-      scoreFieldId: "1",
-      q4FieldId: "2",
-      whatsappFieldId: "3"
-    }
+        scoreFieldId: "10", 
+        q4FieldId: "11",
+        whatsappFieldId: "12",
+    },
+    emailTemplateFunction: templates.nervoviveEmailTemplate,
   },
   {
     quizId: "totalcontrol24",
-    emailTemplateFunction: generateTotalControlEmailContent,
-    affiliateLink: "https://buytc24.net/discovery#aff=gabynos",
-    ctaColor: "#e67e22",
-    ctaText: "Control Blood Sugar Now",
-    subject: "Your TotalControl24 Quiz Results",
-    leadTag: "totalcontrol24_lead",
+    // ... outros campos ...
+    leadTag: 15, // Confirmed from your URL: tagid=15
+    // listId: 5, // OPCIONAL
     activeCampaignFields: {
-      scoreFieldId: "1",
-      q4FieldId: "2",
-      whatsappFieldId: "3"
-    }
+        scoreFieldId: "13", 
+        q4FieldId: "14",
+        whatsappFieldId: "15",
+    },
+    emailTemplateFunction: templates.totalcontrol24EmailTemplate,
   },
   {
     quizId: "glucoshield",
-    emailTemplateFunction: generateGlucoShieldEmailContent,
-    affiliateLink: "https://glucoshieldpro24.com/text.php#aff=gabynos",
-    ctaColor: "#16a085",
-    ctaText: "Stabilize Glucose Levels",
-    subject: "Your GlucoShield Quiz Results",
-    leadTag: "glucoshield_lead",
+    // ... outros campos ...
+    leadTag: 13, // Confirmed from your URL: tagid=13
+    // listId: 5, // OPCIONAL
     activeCampaignFields: {
-      scoreFieldId: "1",
-      q4FieldId: "2",
-      whatsappFieldId: "3"
-    }
+        scoreFieldId: "16", 
+        q4FieldId: "17",
+        whatsappFieldId: "18",
+    },
+    emailTemplateFunction: templates.glucoshieldEmailTemplate,
   },
   {
     quizId: "prostadine",
-    emailTemplateFunction: generateProstadineEmailContent,
-    affiliateLink: "https://prostadine24.com/text.php#aff=gabynos&cam=CAMPAIGNKEY",
-    ctaColor: "#c0392b",
-    ctaText: "Protect Prostate Health",
-    subject: "Your Prostadine Quiz Results",
-    leadTag: "prostadine_lead",
+    // ... outros campos ...
+    leadTag: /* COLOQUE O ID NUMÉRICO DO PROSTADINE AQUI */, // <-- SUBSTITUA ESTE COMENTÁRIO PELO ID REAL!
+    // listId: 5, // OPCIONAL
     activeCampaignFields: {
-      scoreFieldId: "1",
-      q4FieldId: "2",
-      whatsappFieldId: "3"
-    }
-  }
+        scoreFieldId: "19", 
+        q4FieldId: "20",
+        whatsappFieldId: "21",
+    },
+    emailTemplateFunction: templates.prostadineEmailTemplate,
+  },
+  // ... adicione outras configurações de quiz se houver
 ];
