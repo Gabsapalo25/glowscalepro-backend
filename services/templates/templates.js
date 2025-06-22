@@ -1,332 +1,193 @@
-const generateBaseEmail = (data, customContent) => {
+// templates.js — COMPLETO e **ATUALIZADO**
+// ============================================================================
+// • Mantém identidade única para cada produto
+// • Corrige logo (agora servidor MasterTools) — fundo azul #19265b com altura 220px
+// • Inclui "Unsubscribe" com link clicável para https://glowscalepro-2.funnels.mastertools.com/unsubscribe?email={{email}}
+// ============================================================================
+
+const LOGO_URL =
+  "https://content.app-sources.com/s/406737170044669131/uploads/Images/1-removebg-preview-3444739.png";
+
+// ————————————————————————————————————————————————————————————
+function baseEmailTemplate({
+  productName,
+  headingColor,
+  name,
+  score,
+  total,
+  introText,
+  bullets = [],
+  affiliateLink,
+  ctaText
+}) {
+  const bulletsHtml = bullets.map(b => `<li>${b}</li>`).join("\n");
+
   return `
-<!DOCTYPE html>
-<html>
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>${data.subject || 'Your Quiz Results'}</title>
-  <style>
-    body {
-      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-      line-height: 1.6;
-      color: #333;
-      background-color: #f7f9fc;
-      margin: 0;
-      padding: 0;
-    }
-    .container {
-      max-width: 100px;
-      margin: 20px auto;
-      background: #ffffff;
-      border-radius: 10px;
-      overflow: hidden;
-      box-shadow: 0 0 20px rgba(0, 0, 0, 0.05);
-    }
-    .header {
-      background: linear-gradient(135deg, #6a11cb 0%, #2575fc 100%);
-      padding: 30px 20px;
-      text-align: center;
-    }
-    .brand-header {
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      gap: 15px;
-      padding: 10px 0;
-    }
-    .brand-logo {
-      height: 18px;
-      width: auto;
-      max-width: 68px;
-      object-fit: contain;
-    }
-    .content {
-      padding: 30px;
-    }
-    .score-container {
-      text-align: center;
-      margin-bottom: 25px;
-    }
-    .score {
-      font-size: 48px;
-      font-weight: 700;
-      color: #2c3e50;
-      margin: 10px 0;
-    }
-    .total {
-      font-size: 20px;
-      color: #7f8c8d;
-    }
-    .insight {
-      background-color: #f8f9fa;
-      border-left: 4px solid #3498db;
-      padding: 15px;
-      margin: 20px 0;
-      border-radius: 0 4px 4px 0;
-    }
-    .cta-container {
-      text-align: center;
-      margin: 40px 0;
-    }
-    .cta-button {
-      display: inline-block;
-      padding: 15px 40px;
-      border-radius: 30px;
-      font-weight: 700;
-      font-size: 18px;
-      text-transform: uppercase;
-      letter-spacing: 1px;
-      text-decoration: none;
-      transition: all 0.3s ease;
-      box-shadow: 0 4px 15px rgba(0, 0, 0, 0.15);
-    }
-    .cta-button:hover {
-      transform: translateY(-3px);
-      box-shadow: 0 7px 20px rgba(0, 0, 0, 0.2);
-    }
-    .guarantee {
-      font-size: 14px;
-      color: #7f8c8d;
-      margin-top: 10px;
-    }
-    .footer {
-      background-color: #f8f9fa;
-      padding: 20px;
-      text-align: center;
-      font-size: 12px;
-      color: #7f8c8d;
-    }
-    .footer-links a {
-      color: #3498db;
-      text-decoration: none;
-      margin: 0 10px;
-    }
-    .footer-links a:hover {
-      text-decoration: underline;
-    }
-    @media (max-width: 600px) {
-      .content {
-        padding: 20px;
-      }
-      .score {
-        font-size: 36px;
-      }
-      .brand-header {
-        flex-direction: column;
-      }
-    }
-  </style>
-</head>
-<body>
-  <div class="container">
-    <div class="header">
-      <div class="brand-header">
-        <img src="https://content.app-sources.com/s/406737170044669131/uploads/Images/2-removebg-preview-3444630.png" 
-             alt="GlowscalePro Logo" class="brand-logo">
-        <h1>${data.quizTitle || 'Quiz Results'}</h1>
-      </div>
+  <div style="font-family:Segoe UI,Roboto,Helvetica,Arial,sans-serif;max-width:600px;margin:auto;">
+    <div style="background-color:#19265b;padding:24px 0;text-align:center;">
+      <img src="${LOGO_URL}" alt="GlowscalePro Logo" style="max-width:220px;">
     </div>
-    
-    <div class="content">
-      <p>Hello, ${data.name}!</p>
-      
-      <div class="score-container">
-        <div class="score">${data.score}/${data.total}</div>
-        <div class="total">Your Final Score</div>
-      </div>
-      
-      ${customContent}
-      
-      ${data.q4 ? `
-        <div class="insight">
-          <strong>Your Key Insight:</strong> ${data.q4}
-        </div>
-      ` : ''}
-      
-      <div class="cta-container">
-        <a href="${data.affiliateLink}" 
-           class="cta-button" 
-           style="background-color: ${data.ctaColor || '#3498db'}; 
-                  color: ${getContrastColor(data.ctaColor || '#3498db')};">
-          ${data.ctaText || 'Get Your Solution Now!'}
-        </a>
-        <p class="guarantee">Secure checkout · 30-day money-back guarantee</p>
-      </div>
-      
-      <p>Best regards,<br>${data.quizTitle || 'Quiz'} Team</p>
+
+    <h2 style="color:${headingColor};text-align:center;margin-bottom:12px;">${productName} Quiz</h2>
+
+    <p style="margin:0 0 14px;">Hello, ${name}!</p>
+    <p style="font-size:18px;font-weight:bold;margin:0 0 18px;">${score}/${total}<br><span style="font-size:15px;font-weight:400;">Your Final Score</span></p>
+
+    <p style="margin:0 0 20px;">${introText}</p>
+
+    <ul style="padding-left:20px;margin:0 0 28px;">${bulletsHtml}</ul>
+
+    <div style="text-align:center;margin:32px 0;">
+      <a href="${affiliateLink}" style="background:${headingColor};color:#ffffff;padding:14px 32px;border-radius:6px;text-decoration:none;font-weight:600;display:inline-block;">${ctaText}</a>
     </div>
-    
-    <div class="footer">
-      <p>${data.physicalAddress || '123 Business Street, Miami, FL 33101'}</p>
-      <div class="footer-links">
-        <a href="${data.privacyUrl || 'https://glowscalepro.com/privacy'}">Privacy Policy</a>
-        <a href="${data.unsubscribeUrl || 'https://glowscalepro.com/unsubscribe'}">Unsubscribe</a>
-        <a href="${data.contactUrl || 'https://glowscalepro.com/contact'}">Contact Us</a>
-      </div>
-      <p>© ${new Date().getFullYear()} ${data.quizTitle || 'GlowscalePro'}. All rights reserved.</p>
-    </div>
-  </div>
-</body>
-</html>
-  `;
-};
 
-function getContrastColor(hexColor) {
-  if (!hexColor) return '#ffffff';
-  
-  const r = parseInt(hexColor.substr(1, 2), 16);
-  const g = parseInt(hexColor.substr(3, 2), 16);
-  const b = parseInt(hexColor.substr(5, 2), 16);
-  
-  const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
-  
-  return luminance > 0.5 ? '#000000' : '#ffffff';
+    <p style="text-align:center;font-size:12px;color:#888;line-height:1.6;">
+      Want to stop receiving these emails? | <a href="mailto:sac@glowscalepro.com" style="color:#6b7280;text-decoration:underline;">Contact us</a> | <a href="https://glowscalepro-2.funnels.mastertools.com/unsubscribe?email={{email}}" style="color:#e74c3c;text-decoration:underline;">Unsubscribe</a><br>
+      © 2025 GlowscalePro. All rights reserved.
+    </p>
+  </div>`;
 }
 
-export function generateTokmateEmailContent(data) {
-  const customContent = `
-    <p>Congratulations on completing the Tokmate Quiz! Based on your score of ${data.score}/${data.total}, 
-    you're ready to take your TikTok game to the next level.</p>
-    
-    <p>Tokmate is the ultimate TikTok automation tool designed to help you:</p>
-    <ul>
-      <li>Grow your audience exponentially</li>
-      <li>Schedule posts for optimal engagement</li>
-      <li>Analyze performance with advanced metrics</li>
-      <li>Go viral with AI-powered content suggestions</li>
-    </ul>
-  `;
-  
-  return generateBaseEmail({
-    ...data,
-    ctaText: "Get Tokmate Now!",
-    ctaColor: data.ctaColor || "#f39c12"
-  }, customContent);
+// ============================== TOKMATE =====================================
+export function generateTokmateEmailContent({ name, score, total, affiliateLink }) {
+  return baseEmailTemplate({
+    productName: "TokMate",
+    headingColor: "#f59e0b",
+    name,
+    score,
+    total,
+    introText:
+      "You're closer than ever to unlocking viral growth on TikTok. Based on your answers, we believe you're ready to take the next step.",
+    bullets: [
+      "Boost your TikTok growth intelligently",
+      "AI‑driven content ideas",
+      "Monetization made easier"
+    ],
+    affiliateLink,
+    ctaText: "Start Growing on TikTok"
+  });
 }
 
-export function generatePrimebiomeEmailContent(data) {
-  const customContent = `
-    <p>Your PrimeBiome Quiz results are in! With a score of ${data.score}/${data.total}, 
-    you've shown great understanding of gut health importance.</p>
-    
-    <p>PrimeBiome is specially formulated to:</p>
-    <ul>
-      <li>Restore your gut microbiome balance</li>
-      <li>Boost digestion and nutrient absorption</li>
-      <li>Enhance immune system function</li>
-      <li>Increase energy levels naturally</li>
-    </ul>
-  `;
-  
-  return generateBaseEmail({
-    ...data,
-    ctaText: "Balance Your Gut Health",
-    ctaColor: data.ctaColor || "#2ecc71"
-  }, customContent);
+// ============================ PRIME BIOME ===================================
+export function generatePrimeBiomeEmailContent({ name, score, total, affiliateLink }) {
+  return baseEmailTemplate({
+    productName: "PrimeBiome",
+    headingColor: "#27ae60",
+    name,
+    score,
+    total,
+    introText: `Your gut health matters — and with a score of ${score}/${total}, it's clear you're on the right track.`,
+    bullets: [
+      "Balance your microbiome naturally",
+      "Support digestion and immune function",
+      "Feel energized and lighter",
+      "Eliminate bloating and discomfort"
+    ],
+    affiliateLink,
+    ctaText: "Restore Your Gut Health"
+  });
 }
 
-export function generateProdentimEmailContent(data) {
-  const customContent = `
-    <p>Thank you for completing the Prodentim Quiz! Your score of ${data.score}/${data.total} 
-    shows you understand the importance of oral health.</p>
-    
-    <p>Prodentim's probiotic formula is designed to:</p>
-    <ul>
-      <li>Support healthy teeth and gums</li>
-      <li>Balance oral microbiome</li>
-      <li>Freshen breath naturally</li>
-      <li>Strengthen tooth enamel</li>
-    </ul>
-  `;
-  
-  return generateBaseEmail({
-    ...data,
-    ctaText: "Improve Your Oral Health",
-    ctaColor: data.ctaColor || "#3498db"
-  }, customContent);
+// ============================= PRODENTIM ====================================
+export function generateProdentimEmailContent({ name, score, total, affiliateLink }) {
+  return baseEmailTemplate({
+    productName: "ProDentim",
+    headingColor: "#3498db",
+    name,
+    score,
+    total,
+    introText:
+      "Great score! Your oral health journey starts here — ProDentim is packed with probiotics to help.",
+    bullets: [
+      "Strengthen gums and teeth",
+      "Fight bad breath at the root",
+      "Rebuild oral bacteria balance",
+      "Protect enamel naturally"
+    ],
+    affiliateLink,
+    ctaText: "Improve Oral Health"
+  });
 }
 
-export function generateNervoviveEmailContent(data) {
-  const customContent = `
-    <p>Your NervoVive Quiz results are ready! Scoring ${data.score}/${data.total} 
-    indicates you're ready to support your nerve health.</p>
-    
-    <p>NervoVive provides targeted support to:</p>
-    <ul>
-      <li>Relieve nerve discomfort</li>
-      <li>Support nerve regeneration</li>
-      <li>Reduce tingling and numbness</li>
-      <li>Promote healthy nerve function</li>
-    </ul>
-  `;
-  
-  return generateBaseEmail({
-    ...data,
-    ctaText: "Support Your Nerve Health",
-    ctaColor: data.ctaColor || "#3498db"
-  }, customContent);
+// ============================= NERVOVIVE ====================================
+export function generateNervoViveEmailContent({ name, score, total, affiliateLink }) {
+  return baseEmailTemplate({
+    productName: "NervoVive",
+    headingColor: "#9b59b6",
+    name,
+    score,
+    total,
+    introText: `Your nerves deserve relief — and your quiz score of ${score}/${total} shows you're ready.`,
+    bullets: [
+      "Soothe burning or tingling sensations",
+      "Support nerve regeneration",
+      "Promote a calmer nervous system",
+      "Comfort day and night"
+    ],
+    affiliateLink,
+    ctaText: "Soothe Nerve Discomfort"
+  });
 }
 
-export function generateTotalControl24EmailContent(data) {
-  const customContent = `
-    <p>Congratulations on completing the Total Control 24 Quiz! With a score of ${data.score}/${data.total}, 
-    you're ready to take control of your health.</p>
-    
-    <p>Total Control 24 helps you:</p>
-    <ul>
-      <li>Manage blood sugar levels</li>
-      <li>Boost natural insulin sensitivity</li>
-      <li>Reduce sugar cravings</li>
-      <li>Support healthy weight management</li>
-    </ul>
-  `;
-  
-  return generateBaseEmail({
-    ...data,
-    ctaText: "Take Control Now",
-    ctaColor: data.ctaColor || "#3498db"
-  }, customContent);
+// =========================== TOTAL CONTROL 24 ===============================
+export function generateTotalControlEmailContent({ name, score, total, affiliateLink }) {
+  return baseEmailTemplate({
+    productName: "TotalControl24",
+    headingColor: "#e67e22",
+    name,
+    score,
+    total,
+    introText:
+      "Great score! You're serious about your health — Total Control 24 is your next step.",
+    bullets: [
+      "Balance blood sugar naturally",
+      "Improve insulin response",
+      "Fight cravings and control appetite",
+      "Support stable energy all day"
+    ],
+    affiliateLink,
+    ctaText: "Control Blood Sugar Now"
+  });
 }
 
-export function generateGlucosShieldEmailContent(data) {
-  const customContent = `
-    <p>Your GlucoShield Quiz results are here! Scoring ${data.score}/${data.total} 
-    shows you understand the importance of blood sugar management.</p>
-    
-    <p>GlucoShield is scientifically formulated to:</p>
-    <ul>
-      <li>Support healthy glucose metabolism</li>
-      <li>Enhance insulin sensitivity</li>
-      <li>Protect against oxidative stress</li>
-      <li>Promote cardiovascular health</li>
-    </ul>
-  `;
-  
-  return generateBaseEmail({
-    ...data,
-    ctaText: "Support Healthy Glucose Levels",
-    ctaColor: data.ctaColor || "#3498db"
-  }, customContent);
+// ============================ GLUCOSHIELD ===================================
+export function generateGlucoShieldEmailContent({ name, score, total, affiliateLink }) {
+  return baseEmailTemplate({
+    productName: "GlucoShield Pro",
+    headingColor: "#16a085",
+    name,
+    score,
+    total,
+    introText: "You're informed — now protect your body with GlucoShield Pro.",
+    bullets: [
+      "Stabilize blood sugar safely",
+      "Protect cells from oxidative stress",
+      "Boost metabolism and clarity",
+      "Reduce inflammation at the source"
+    ],
+    affiliateLink,
+    ctaText: "Stabilize Glucose Levels"
+  });
 }
 
-export function generateProstadineEmailContent(data) {
-  const customContent = `
-    <p>Thank you for completing the Prostadine Quiz! Your score of ${data.score}/${data.total} 
-    indicates you're ready to support your prostate health.</p>
-    
-    <p>Prostadine provides comprehensive support to:</p>
-    <ul>
-      <li>Maintain prostate health</li>
-      <li>Support urinary function</li>
-      <li>Reduce nighttime bathroom visits</li>
-      <li>Promote healthy inflammation response</li>
-    </ul>
-  `;
-  
-  return generateBaseEmail({
-    ...data,
-    ctaText: "Support Prostate Health",
-    ctaColor: data.ctaColor || "#3498db"
-  }, customContent);
+// ============================== PROSTADINE ==================================
+export function generateProstadineEmailContent({ name, score, total, affiliateLink }) {
+  return baseEmailTemplate({
+    productName: "Prostadine",
+    headingColor: "#c0392b",
+    name,
+    score,
+    total,
+    introText: `Your result (${score}/${total}) shows you care about men's health — Prostadine can make a real difference.`,
+    bullets: [
+      "Support healthy prostate function",
+      "Reduce urgency & frequency",
+      "Promote restful sleep and confidence",
+      "Balance inflammation response"
+    ],
+    affiliateLink,
+    ctaText: "Protect Prostate Health"
+  });
 }
+// ============================================================================
+// Fim do arquivo templates.js

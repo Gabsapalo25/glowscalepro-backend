@@ -1,0 +1,86 @@
+// create-tags.cjs
+
+const fetch = require("node-fetch");
+require("dotenv").config();
+const API_URL = "https://glowscalepro48745.activehosted.com/api/3";
+const API_KEY = process.env.ACTIVECAMPAIGN_API_KEY;
+
+const headers = {
+  "Api-Token": API_KEY,
+  "Content-Type": "application/json",
+};
+
+const products = [
+  "tokmate",
+  "primebiome",
+  "prodentim",
+  "prostadine",
+  "glucoshield",
+  "nervovive",
+  "totalcontrol24",
+];
+
+// Níveis de consciência
+const levels = ["low", "mid", "high"];
+
+// Gera todas as tags: tag principal + subtags de nível de consciência
+const tags = [];
+
+products.forEach((product) => {
+  tags.push(`${product}_lead`);
+  levels.forEach((level) => {
+    tags.push(`${product}_${level}`);
+  });
+});
+
+async function tagExists(tagName) {
+  const response = await fetch(`${API_URL}/tags?search=${tagName}`, {
+    method: "GET",
+    headers,
+  });
+
+  if (!response.ok) {
+    throw new Error(`Erro ao verificar tag: ${tagName}`);
+  }
+
+  const data = await response.json();
+  return data.tags && data.tags.length > 0;
+}
+
+async function createTag(tagName) {
+  const response = await fetch(`${API_URL}/tags`, {
+    method: "POST",
+    headers,
+    body: JSON.stringify({
+      tag: {
+        tag: tagName,
+        tagType: "contact", // Tipo de tag
+        description: `Tag for ${tagName.replace(/_/g, " ")}`,
+      },
+    }),
+  });
+
+  if (!response.ok) {
+    throw new Error(`Erro ao criar tag ${tagName}: ${response.statusText}`);
+  }
+
+  const data = await response.json();
+  console.log(`🎉 Tag criada com sucesso: ${tagName}`);
+}
+
+async function createTags() {
+  for (const tag of tags) {
+    try {
+      const exists = await tagExists(tag);
+      if (exists) {
+        console.log(`✅ Tag já existe: ${tag}`);
+      } else {
+        await createTag(tag);
+      }
+    } catch (err) {
+      console.error(`❌ ${err.message}`);
+    }
+  }
+}
+
+createTags();

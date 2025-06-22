@@ -1,130 +1,81 @@
 {
   "quizzesConfig": [
     {
-      "quizId": "tokmate",
-      "quizTitle": "Tokmate Quiz",
-      "affiliateLink": "https://get.tokmate.com/?aid=1743057",
-      "subject": "Your Tokmate Quiz Results",
-      "emailTemplate": "tokmate",
-      "ctaColor": "#f39c12",
-      "physicalAddress": "123 Business Street, Miami, FL 33101",
-      "privacyUrl": "https://glowscalepro.com/privacy",
-      "unsubscribeUrl": "https://glowscalepro.com/unsubscribe",
+      "quizId": "nervovive",
+      "subject": "Your NervoVive Quiz Result",
+      "leadTag": "nervovive_lead",
       "activeCampaignFields": {
-        "listId": 6,
-        "scoreFieldId": 15,
-        "q4FieldId": 22,
-        "whatsappFieldId": 30
+        "scoreFieldId": "5",
+        "q4FieldId": "6",
+        "whatsappFieldId": "7"
       },
-      "leadTagId": 123
-    },
-    {
-      "quizId": "prodentim",
-      "quizTitle": "Prodentim Quiz",
-      "affiliateLink": "https://prodentim24.com/text.php#aff=gabynos",
-      "subject": "Your Prodentim Quiz Results",
-      "emailTemplate": "prodentim",
-      "ctaColor": "#3498db",
-      "physicalAddress": "123 Business Street, Miami, FL 33101",
-      "privacyUrl": "https://glowscalepro.com/privacy",
-      "unsubscribeUrl": "https://glowscalepro.com/unsubscribe",
-      "activeCampaignFields": {
-        "listId": 7,
-        "scoreFieldId": 16,
-        "q4FieldId": 23,
-        "whatsappFieldId": 31
-      },
-      "leadTagId": 124
+      "unsubscribeUrl": "https://glowscalepro-2.funnels.mastertools.com/unsubscribe?v"
     },
     {
       "quizId": "primebiome",
-      "quizTitle": "PrimeBiome Quiz",
-      "affiliateLink": "https://primebiome24.com/text.php#aff=gabynos",
-      "subject": "Your PrimeBiome Results",
-      "emailTemplate": "primebiome",
-      "ctaColor": "#2ecc71",
-      "physicalAddress": "123 Business Street, Miami, FL 33101",
-      "privacyUrl": "https://glowscalepro.com/privacy",
-      "unsubscribeUrl": "https://glowscalepro.com/unsubscribe",
+      "subject": "Your PrimeBiome Quiz Result",
+      "leadTag": "primebiome_lead",
       "activeCampaignFields": {
-        "listId": 3,
-        "scoreFieldId": 17,
-        "q4FieldId": 24,
-        "whatsappFieldId": 32
+        "scoreFieldId": "8",
+        "q4FieldId": "9",
+        "whatsappFieldId": "10"
       },
-      "leadTagId": 125
+      "unsubscribeUrl": "https://glowscalepro-2.funnels.mastertools.com/unsubscribe?v"
     },
     {
-      "quizId": "nervovive",
-      "quizTitle": "NervoVive Quiz",
-      "affiliateLink": "https://nervovive24.com/text.php#aff=gabynos",
-      "subject": "Your NervoVive Quiz Results",
-      "emailTemplate": "nervovive",
-      "ctaColor": "#3498db",
-      "physicalAddress": "123 Business Street, Miami, FL 33101",
-      "privacyUrl": "https://glowscalepro.com/privacy",
-      "unsubscribeUrl": "https://glowscalepro.com/unsubscribe",
+      "quizId": "prodentim",
+      "subject": "Your Prodentim Quiz Result",
+      "leadTag": "prodentim_lead",
       "activeCampaignFields": {
-        "listId": 4,
-        "scoreFieldId": 18,
-        "q4FieldId": 25,
-        "whatsappFieldId": 33
+        "scoreFieldId": "11",
+        "q4FieldId": "12",
+        "whatsappFieldId": "13"
       },
-      "leadTagId": 126
+      "unsubscribeUrl": "https://glowscalepro-2.funnels.mastertools.com/unsubscribe?v"
+    },
+    {
+      "quizId": "tokmate",
+      "subject": "Your Tokmate Quiz Result",
+      "leadTag": "tokmate_lead",
+      "activeCampaignFields": {
+        "scoreFieldId": "14",
+        "q4FieldId": "15",
+        "whatsappFieldId": "16"
+      },
+      "unsubscribeUrl": "https://glowscalepro-2.funnels.mastertools.com/unsubscribe?v"
     },
     {
       "quizId": "totalcontrol24",
-      "quizTitle": "Total Control 24 Quiz",
-      "affiliateLink": "https://buytc24.net/discovery#aff=gabynos",
-      "subject": "Your TotalControl24 Quiz Results",
-      "emailTemplate": "totalcontrol24",
-      "ctaColor": "#3498db",
-      "physicalAddress": "123 Business Street, Miami, FL 33101",
-      "privacyUrl": "https://glowscalepro.com/privacy",
-      "unsubscribeUrl": "https://glowscalepro.com/unsubscribe",
+      "subject": "Your TotalControl24 Quiz Result",
+      "leadTag": "totalcontrol24_lead",
       "activeCampaignFields": {
-        "listId": 5,
-        "scoreFieldId": 19,
-        "q4FieldId": 26,
-        "whatsappFieldId": 34
+        "scoreFieldId": "17",
+        "q4FieldId": "18",
+        "whatsappFieldId": "19"
       },
-      "leadTagId": 127
+      "unsubscribeUrl": "https://glowscalepro-2.funnels.mastertools.com/unsubscribe?v"
     },
     {
       "quizId": "glucoshield",
-      "quizTitle": "GlucoShield Quiz",
-      "affiliateLink": "https://glucoshieldpro24.com/text.php#aff=gabynos",
-      "subject": "Your GlucoShield Quiz Results",
-      "emailTemplate": "glucoshield",
-      "ctaColor": "#3498db",
-      "physicalAddress": "123 Business Street, Miami, FL 33101",
-      "privacyUrl": "https://glowscalepro.com/privacy",
-      "unsubscribeUrl": "https://glowscalepro.com/unsubscribe",
+      "subject": "Your GlucoShield Quiz Result",
+      "leadTag": "glucoshield_lead",
       "activeCampaignFields": {
-        "listId": 10,
-        "scoreFieldId": 20,
-        "q4FieldId": 27,
-        "whatsappFieldId": 35
+        "scoreFieldId": "20",
+        "q4FieldId": "21",
+        "whatsappFieldId": "22"
       },
-      "leadTagId": 128
+      "unsubscribeUrl": "https://glowscalepro-2.funnels.mastertools.com/unsubscribe?v"
     },
     {
       "quizId": "prostadine",
-      "quizTitle": "Prostadine Quiz",
-      "affiliateLink": "https://prostadine24.com/text.php#aff=gabynos&cam=CAMPAIGNKEY",
-      "subject": "Your Prostadine Quiz Results",
-      "emailTemplate": "prostadine",
-      "ctaColor": "#3498db",
-      "physicalAddress": "123 Business Street, Miami, FL 33101",
-      "privacyUrl": "https://glowscalepro.com/privacy",
-      "unsubscribeUrl": "https://glowscalepro.com/unsubscribe",
+      "subject": "Your Prostadine Quiz Result",
+      "leadTag": "prostadine_lead",
       "activeCampaignFields": {
-        "listId": 11,
-        "scoreFieldId": 21,
-        "q4FieldId": 28,
-        "whatsappFieldId": 36
+        "scoreFieldId": "23",
+        "q4FieldId": "24",
+        "whatsappFieldId": "25"
       },
-      "leadTagId": 129
+      "unsubscribeUrl": "https://glowscalepro-2.funnels.mastertools.com/unsubscribe?v"
     }
   ]
 }

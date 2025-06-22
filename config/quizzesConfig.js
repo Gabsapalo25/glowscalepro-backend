@@ -1,97 +1,113 @@
-import { readFileSync } from 'fs';
-import { join } from 'path';
+// quizzesConfig.js — atualizado com links corretos e campos ActiveCampaign
+// ============================================================
+
 import {
-  generatePrimebiomeEmailContent,
   generateTokmateEmailContent,
-  generateNervoviveEmailContent,
+  generatePrimeBiomeEmailContent,
   generateProdentimEmailContent,
-  generateTotalControl24EmailContent,
-  generateGlucosShieldEmailContent,
+  generateNervoViveEmailContent,
+  generateTotalControlEmailContent,
+  generateGlucoShieldEmailContent,
   generateProstadineEmailContent
 } from '../services/templates/templates.js';
 
-const dataPath = join(process.cwd(), 'config', 'data.json');
-const rawData = readFileSync(dataPath, 'utf-8');
-const configData = JSON.parse(rawData);
-
-if (!configData.quizzesConfig || !Array.isArray(configData.quizzesConfig)) {
-  throw new Error('Estrutura inválida em data.json: quizzesConfig deve ser um array');
-}
-
-const quizzesRaw = configData.quizzesConfig;
-
-const quizzesConfigMap = quizzesRaw.reduce((map, quiz) => {
-  try {
-    const key = quiz.quizId.toLowerCase();
-    
-    if (!key) {
-      throw new Error('Quiz sem quizId definido');
+export const quizzesConfig = [
+  {
+    quizId: "tokmate",
+    emailTemplateFunction: generateTokmateEmailContent,
+    affiliateLink: "https://get.tokmate.com/?aid=1743057",
+    ctaColor: "#8B5CF6",
+    ctaText: "Start Growing on TikTok",
+    subject: "Your TokMate Quiz Results",
+    leadTag: "tokmate_lead",
+    activeCampaignFields: {
+      scoreFieldId: "1",
+      q4FieldId: "2",
+      whatsappFieldId: "3"
     }
-    
-    const templateMap = {
-      nervovive: generateNervoviveEmailContent,
-      primebiome: generatePrimebiomeEmailContent,
-      tokmate: generateTokmateEmailContent,
-      prodentim: generateProdentimEmailContent,
-      totalcontrol24: generateTotalControl24EmailContent,
-      glucoshield: generateGlucosShieldEmailContent,
-      prostadine: generateProstadineEmailContent
-    };
-
-    const templateFunction = templateMap[quiz.emailTemplate] || generateTokmateEmailContent;
-    
-    if (!quiz.affiliateLink) {
-      console.warn(`⚠️ Aviso: Quiz ${key} sem affiliateLink definido!`);
+  },
+  {
+    quizId: "primebiome",
+    emailTemplateFunction: generatePrimeBiomeEmailContent,
+    affiliateLink: "https://primebiome24.com/text.php#aff=gabynos",
+    ctaColor: "#10B981",
+    ctaText: "Restore Your Gut Health",
+    subject: "Your PrimeBiome Quiz Results",
+    leadTag: "primebiome_lead",
+    activeCampaignFields: {
+      scoreFieldId: "1",
+      q4FieldId: "2",
+      whatsappFieldId: "3"
     }
-    
-    if (!quiz.subject) {
-      console.warn(`⚠️ Aviso: Quiz ${key} sem subject definido!`);
+  },
+  {
+    quizId: "prodentim",
+    emailTemplateFunction: generateProdentimEmailContent,
+    affiliateLink: "https://prodentim24.com/text.php#aff=gabynos",
+    ctaColor: "#3B82F6",
+    ctaText: "Get ProDentim Now",
+    subject: "Your ProDentim Quiz Results",
+    leadTag: "prodentim_lead",
+    activeCampaignFields: {
+      scoreFieldId: "1",
+      q4FieldId: "2",
+      whatsappFieldId: "3"
     }
-    
-    map[key] = {
-      quizTitle: quiz.quizTitle || `Quiz ${key}`,
-      affiliateLink: quiz.affiliateLink || '',
-      subject: quiz.subject || 'Your Quiz Results',
-      ctaColor: quiz.ctaColor || '#3498db',
-      physicalAddress: quiz.physicalAddress,
-      privacyUrl: quiz.privacyUrl,
-      unsubscribeUrl: quiz.unsubscribeUrl,
-      activeCampaignFields: {
-        listId: quiz.activeCampaignFields?.listId || 0,
-        scoreFieldId: quiz.activeCampaignFields?.scoreFieldId || 0,
-        q4FieldId: quiz.activeCampaignFields?.q4FieldId || 0,
-        whatsappFieldId: quiz.activeCampaignFields?.whatsappFieldId || 0
-      },
-      leadTagId: quiz.leadTagId || null,
-      generateEmailContent: templateFunction
-    };
-
-    return map;
-  } catch (error) {
-    console.error(`❌ Erro processando quiz: ${error.message}`);
-    return map;
+  },
+  {
+    quizId: "nervovive",
+    emailTemplateFunction: generateNervoViveEmailContent,
+    affiliateLink: "https://nervovive24.com/text.php#aff=gabynos",
+    ctaColor: "#F59E0B",
+    ctaText: "Buy NervoVive Now",
+    subject: "Your NervoVive Quiz Results",
+    leadTag: "nervovive_lead",
+    activeCampaignFields: {
+      scoreFieldId: "1",
+      q4FieldId: "2",
+      whatsappFieldId: "3"
+    }
+  },
+  {
+    quizId: "totalcontrol24",
+    emailTemplateFunction: generateTotalControlEmailContent,
+    affiliateLink: "https://buytc24.net/discovery#aff=gabynos",
+    ctaColor: "#EF4444",
+    ctaText: "Reclaim Control Today",
+    subject: "Your TotalControl24 Quiz Results",
+    leadTag: "totalcontrol24_lead",
+    activeCampaignFields: {
+      scoreFieldId: "1",
+      q4FieldId: "2",
+      whatsappFieldId: "3"
+    }
+  },
+  {
+    quizId: "glucoshield",
+    emailTemplateFunction: generateGlucoShieldEmailContent,
+    affiliateLink: "https://glucoshieldpro24.com/text.php#aff=gabynos",
+    ctaColor: "#6366F1",
+    ctaText: "Support Healthy Glucose",
+    subject: "Your GlucoShield Quiz Results",
+    leadTag: "glucoshield_lead",
+    activeCampaignFields: {
+      scoreFieldId: "1",
+      q4FieldId: "2",
+      whatsappFieldId: "3"
+    }
+  },
+  {
+    quizId: "prostadine",
+    emailTemplateFunction: generateProstadineEmailContent,
+    affiliateLink: "https://prostadine24.com/text.php#aff=gabynos&cam=CAMPAIGNKEY",
+    ctaColor: "#D97706",
+    ctaText: "Protect Your Prostate Now",
+    subject: "Your Prostadine Quiz Results",
+    leadTag: "prostadine_lead",
+    activeCampaignFields: {
+      scoreFieldId: "1",
+      q4FieldId: "2",
+      whatsappFieldId: "3"
+    }
   }
-}, {});
-
-console.log('✅ Quizzes carregados:');
-Object.keys(quizzesConfigMap).forEach(key => {
-  console.log(`- ${key}: ${quizzesConfigMap[key].quizTitle} (List ID: ${quizzesConfigMap[key].activeCampaignFields.listId})`);
-});
-
-export function getById(quizId) {
-  if (!quizId || typeof quizId !== 'string') {
-    throw new Error('ID de quiz inválido: deve ser uma string');
-  }
-  
-  const normalizedId = quizId.toLowerCase();
-  const config = quizzesConfigMap[normalizedId];
-  
-  if (!config) {
-    console.error(`❌ Quiz não encontrado: ${quizId}`);
-    throw new Error(`Configuração não encontrada para o quiz: ${quizId}`);
-  }
-  
-  return config;
-}
-
-export const quizzesConfig = quizzesConfigMap;
+];
