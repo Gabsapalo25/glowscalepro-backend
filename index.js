@@ -1,4 +1,4 @@
-// src/index.js - VERSÃO COMPLETA E FINAL (CORRIGIDA: SEM ERRO DE SINTAXE DE MARKDOWN)
+// src/index.js - VERSÃO COMPLETA E FINAL (CORRIGIDA)
 import express from 'express';
 import bodyParser from 'body-parser';
 import cors from 'cors';
@@ -9,7 +9,7 @@ import quizzesRoutes from './routes/quizzesRoutes.js';
 import mailRoutes from './routes/mailRoutes.js';
 import unsubscribeRoutes from './routes/unsubscribeRoutes.js';
 import activeCampaignService from './services/activeCampaignService.js';
-import { quizzesConfig } from './config/quizzesConfig.js'; 
+import { quizzesConfig } from './config/quizzesConfig.js'; // Correção: importação de export nomeado
 
 dotenv.config();
 
@@ -20,15 +20,11 @@ const logger = pino({
 const app = express();
 
 // Validação de TODAS as Variáveis de Ambiente Necessárias
-// Os nomes das chaves aqui devem corresponder EXATAMENTE aos nomes no Render e no seu .env local.
 const env = cleanEnv(process.env, {
-    // Variáveis gerais do servidor
     PORT: num({ devDefault: 10000 }),
     NODE_ENV: str({ devDefault: 'development' }),
     FRONTEND_URL: str({ devDefault: 'http://localhost:3001' }),
     ALLOWED_ORIGINS: str({ devDefault: 'http://localhost:3001' }),
-
-    // Variáveis do SMTP
     ADMIN_EMAIL: str(),
     SMTP_HOST: str(),
     SMTP_PORT: num(),
@@ -36,21 +32,12 @@ const env = cleanEnv(process.env, {
     SMTP_PASS: str(),
     SMTP_SECURE: str({ devDefault: 'false' }),
     SMTP_TLS_REJECT_UNAUTHORIZED: str({ devDefault: 'true' }),
-
-    // Variáveis do ActiveCampaign (nomes exatos do Render)
     ACTIVE_CAMPAIGN_API_URL: str(),
     ACTIVE_CAMPAIGN_API_KEY: str(),
-    AC_LIST_ID_MASTERTOOLS_ALL: num(), 
-    UNSUBSCRIBE_TAG_ID: num(), 
-
-    // Outras variáveis que você possa ter no seu ambiente Render/local
-    // MASTERTOOLS_UNSUBSCRIBE_URL: str({ devDefault: 'http://localhost:3001/unsubscribe' }),
-    // SRC_SECRET: str({ devDefault: 'sua-chave-secreta-padrao' }),
-    // DEV_API_KEY: str({ devDefault: 'chave-dev-opcional' }),
-    // REDIS_URL: str({ devDefault: 'redis://localhost:6379' }),
+    AC_LIST_ID_MASTERTOOLS_ALL: num(),
+    UNSUBSCRIBE_TAG_ID: num(),
 });
 
-// Configuração do Express e Middlewares
 app.use(bodyParser.json());
 
 const allowedOrigins = env.ALLOWED_ORIGINS.split(',').map(origin => origin.trim());
@@ -90,7 +77,6 @@ app.use((req, res, next) => {
     next();
 });
 
-// Definição de Rotas
 app.use('/api', quizzesRoutes);
 app.use('/api', mailRoutes);
 app.use('/api', unsubscribeRoutes);
@@ -99,7 +85,6 @@ app.get('/', (req, res) => {
     res.send('API is running!');
 });
 
-// Inicialização do Servidor
 const PORT = env.PORT;
 
 app.listen(PORT, async () => {
@@ -119,20 +104,17 @@ app.listen(PORT, async () => {
         logger.error(`Detalhes da configuração SMTP: Host=${env.SMTP_HOST}, Port=${env.SMTP_PORT}, User=${env.SMTP_USER}`);
     }
 
-    // Logs da Configuração do ActiveCampaign
     logger.info(`📊 ActiveCampaign: ${env.ACTIVE_CAMPAIGN_API_KEY ? 'Ativo' : 'Inativo'}`);
     logger.info(`   - API URL: ${env.ACTIVE_CAMPAIGN_API_URL}`);
     logger.info(`   - MasterTools List ID: ${env.AC_LIST_ID_MASTERTOOLS_ALL}`);
     logger.info(`   - Unsubscribe Tag ID: ${env.UNSUBSCRIBE_TAG_ID}`);
 
-    // Carregamento e Log dos Quizzes (ADAPTADO À SUA ESTRUTURA)
-    logger.info(`✅ Quizzes carregados:`);
-    if (quizzesConfig && Array.isArray(quizzesConfig) && quizzesConfig.length > 0) {
+    logger.info('✅ Quizzes carregados:');
+    if (quizzesConfig && Array.isArray(quizzesConfig)) {
         quizzesConfig.forEach(quiz => {
-            logger.info(`- ${quiz.quizId || 'ID Indefinido'}: ${quiz.subject || 'Assunto Indefinido'}`);
+            logger.info(`- ${quiz.quizId}: ${quiz.subject} (List ID: ${quiz.activeCampaignFields ? quiz.activeCampaignFields.scoreFieldId : 'Indefinido'})`);
         });
     } else {
-        logger.warn(`- Nenhuma configuração de quiz encontrada em src/config/quizzesConfig.js ou estrutura inválida.`);
-        logger.warn(`- Por favor, verifique se 'quizzesConfig' é um array de objetos válidos.`);
+        logger.warn('- Nenhuma configuração de quiz encontrada ou estrutura inválida.');
     }
 });
