@@ -1,322 +1,197 @@
-// index.js — Versão FINAL e consolidada
-// -------------------------------------------------------------------------------------------------
-// • SMTP robusto com fallback de segurança
-// • CSRF (token por cookie) para rotas que precisam de proteção
-// • ActiveCampaign sincroniza tags e força entrada na lista
-// • Novo endpoint para Descadastro via ActiveCampaign
-// • Logging profissional e CORS configurado para múltiplas origens
-// -------------------------------------------------------------------------------------------------
-
 import express from 'express';
-import cors from 'cors';
-import helmet from 'helmet';
-import nodemailer from 'nodemailer';
-import csrf from 'csurf';
-import cookieParser from 'cookie-parser';
-import bodyParser from 'body-parser';
 import dotenv from 'dotenv';
-import axios from 'axios';
-import { cleanEnv, str, url } from 'envalid'; // Importar cleanEnv, str, url
+import cors from 'cors';
+import bodyParser from 'body-parser';
+import nodemailer from 'nodemailer';
+import winston from 'winston';
+import activeCampaignService from './services/activeCampaignService.js';
+import quizConfigs from './config/quizzesConfig.js';
+import dataConfig from './config/data.json' assert { type: 'json' };
 
-// Imports de módulos existentes
-import { quizzesConfig } from './config/quizzesConfig.js';
-import {
-  generateTokmateEmailContent,
-  generatePrimeBiomeEmailContent,
-  generateProdentimEmailContent,
-  generateNervoViveEmailContent,
-  generateTotalControlEmailContent,
-  generateGlucoShieldEmailContent,
-  generateProstadineEmailContent
-} from './services/templates/templates.js';
-
-// Importar as funções do ActiveCampaignService (CERTIFIQUE-SE DE QUE ESTE ARQUIVO ESTEJA ATUALIZADO)
-import { getContactByEmail, addTagToContact } from './services/activeCampaignService.js';
-
-
-// ------------------------------------------------------
-// Configuração Inicial e Variáveis de Ambiente
-// ------------------------------------------------------
-dotenv.config(); // Carrega as variáveis do .env
+dotenv.config();
 
 const app = express();
-const PORT = process.env.PORT || 10000;
-const ENV = process.env.NODE_ENV || 'development';
+const port = process.env.PORT || 10000;
+const FRONTEND_URL = process.env.FRONTEND_URL || 'https://glowscalepro-2.funnels.mastertools.com';
+const SMTP_HOST = process.env.SMTP_HOST || 'smtp.zoho.com';
+const SMTP_USER = process.env.SMTP_USER || 'sac@glowscalepro.com';
+const SMTP_PASS = process.env.SMTP_PASS;
 
-// Validação das variáveis de ambiente usando envalid
-const env = cleanEnv(process.env, {
-    PORT: str({ default: '10000' }),
-    NODE_ENV: str({ default: 'development', choices: ['development', 'production', 'test'] }),
-    FRONTEND_URL: url(),
-    MASTERTOOLS_UNSUBSCRIBE_URL: url(), // Usado para CORS do endpoint de descadastro
-    
-    // SMTP
-    SMTP_HOST: str(),
-    SMTP_PORT: str(),
-    SMTP_SECURE: str({ choices: ['true', 'false'] }),
-    SMTP_USER: str(),
-    SMTP_PASS: str(),
-    SMTP_TLS_REJECT_UNAUTHORIZED: str({ choices: ['true', 'false'] }),
-
-    // ActiveCampaign
-    ACTIVE_CAMPAIGN_API_URL: url(),
-    ACTIVE_CAMPAIGN_API_KEY: str(),
-    AC_UNSUBSCRIBE_TAG_ID: str(), // ID da tag 'descadastro-solicitado'
-
-    // Admin & Logging
-    ADMIN_EMAIL: str(),
-    LOG_LEVEL: str({ default: 'info', choices: ['fatal', 'error', 'warn', 'info', 'debug', 'trace'] }),
-    MASTER_LIST_ID: str({ default: '' }), // ID da sua lista principal, se usada
-
-    // Development Testing
-    DEV_API_KEY: str({ default: '' }), // Para propósitos de desenvolvimento/teste
-
-    // Redis (para CSRF e Rate Limiting)
-    REDIS_URL: url({ default: 'redis://localhost:6379' }),
-    SRC_SECRET: str(), // Chave secreta para sessions/cookies
+// Configuração do Logger
+const logger = winston.createLogger({
+    level: 'info',
+    format: winston.format.combine(
+        winston.format.timestamp({
+            format: 'YYYY-MM-DD HH:mm:ss'
+        }),
+        winston.format.printf(info => `[${info.timestamp}] ${info.level.toUpperCase()}: ${info.message}`)
+    ),
+    transports: [
+        new winston.transports.Console(),
+        new winston.transports.File({ filename: 'app.log' }) // Para logs em arquivo
+    ]
 });
 
-
-// ------------------------------------------------------
-// Logger
-// ------------------------------------------------------
-// Usando console.log/error/warn diretamente para simplicidade.
-// Você pode integrar seu pino logger configurado aqui se preferir.
-const logger = {
-  info: (...args) => console.log('INFO:', ...args),
-  error: (...args) => console.error('ERROR:', ...args),
-  warn: (...args) => console.warn('WARN:', ...args)
-};
-
-
-// ------------------------------------------------------
-// Middlewares Globais
-// ------------------------------------------------------
-app.use(helmet()); // Proteção de cabeçalhos HTTP
-app.use(cookieParser()); // Parsing de cookies
-app.use(bodyParser.json()); // Parsing de corpo de requisição JSON
-app.use(bodyParser.urlencoded({ extended: true })); // Parsing de corpo de requisição URL-encoded
-
-
-// Configuração CORS (Permite múltiplas origens de acordo com o .env)
-const allowedOrigins = [env.FRONTEND_URL];
-// Adiciona o URL da MasterTools à lista de origens permitidas se for diferente
-if (env.MASTERTOOLS_UNSUBSCRIBE_URL && !allowedOrigins.includes(env.MASTERTOOLS_UNSUBSCRIBE_URL)) {
-    allowedOrigins.push(env.MASTERTOOLS_UNSUBSCRIBE_URL);
-}
-// Se FRONTEND_URL e MASTERTOOLS_UNSUBSCRIBE_URL forem o mesmo, não há duplicação na lista.
-
+// Middlewares
 app.use(cors({
-    origin: function (origin, callback) {
-        // Permitir requisições sem origem (como de clientes REST ou mobile apps)
-        if (!origin) return callback(null, true);
-        if (allowedOrigins.indexOf(origin) === -1) {
-            const msg = `CORS Error: Origin '${origin}' is not allowed by the application's CORS policy.`;
-            logger.error(msg); // Logar o erro de CORS para depuração
-            return callback(new Error(msg), false);
-        }
-        return callback(null, true);
-    },
-    credentials: true // Necessário para enviar/receber cookies (ex: CSRF token)
+    origin: '*', // Permitir todas as origens (ajustar para algo mais restritivo em produção)
+    methods: ['GET', 'POST'],
+    allowedHeaders: ['Content-Type', 'Authorization']
 }));
-
-// Proteção CSRF - Usar apenas onde for necessário (rotas de formulário)
-// A rota de descadastro da MasterTools NÃO usará isso.
-const csrfProtection = csrf({ cookie: { httpOnly: true, sameSite: 'lax' } });
+app.use(bodyParser.json());
+app.use(bodyParser.urlencoded({ extended: true }));
 
 
-// ------------------------------------------------------
-// Nodemailer — Configuração SMTP
-// ------------------------------------------------------
+// Configuração do Nodemailer (mantido para testes de conexão)
 const transporter = nodemailer.createTransport({
-  host: env.SMTP_HOST,
-  port: Number(env.SMTP_PORT),
-  secure: env.SMTP_SECURE === 'true', // true para porta 465 (TLS), false para 587 (STARTTLS)
-  auth: {
-    user: env.SMTP_USER,
-    pass: env.SMTP_PASS
-  },
-  tls: {
-    // Definir como true em produção para segurança rigorosa
-    rejectUnauthorized: env.SMTP_TLS_REJECT_UNAUTHORIZED === 'true'
-  }
-});
-
-transporter.verify(err =>
-  err
-    ? logger.error('❌ SMTP connection failed:', err.message)
-    : logger.info('✅ SMTP connection verified successfully')
-);
-
-
-// ------------------------------------------------------
-// Rotas da API
-// ------------------------------------------------------
-
-// Rota para obter token CSRF (Protegida por CSRF)
-app.get('/api/csrf-token', csrfProtection, (req, res) => {
-  res.json({ csrfToken: req.csrfToken() });
-});
-
-// Rota para envio de resultados de quiz e sincronização com ActiveCampaign (Protegida por CSRF)
-app.post('/send-result', csrfProtection, async (req, res) => {
-  try {
-    const { name, email, score, total, quizId, q4 = '', whatsapp = '' } = req.body;
-    const quiz = quizzesConfig.find(q => q.quizId === quizId);
-    
-    if (!quiz) {
-        logger.warn(`Quiz configuration not found for quizId: ${quizId}`);
-        return res.status(400).json({ success: false, message: 'Quiz configuration not found.' });
+    host: SMTP_HOST,
+    port: 587,
+    secure: false, // Use 'true' se for porta 465 com SSL/TLS
+    auth: {
+        user: SMTP_USER,
+        pass: SMTP_PASS
     }
+});
 
-    // 1. Envio de Email
-    const html = quiz.emailTemplateFunction({
-      name,
-      score,
-      total,
-      q4,
-      affiliateLink: quiz.affiliateLink,
-      ctaColor: quiz.ctaColor,
-      ctaText: quiz.ctaText
+// Função para carregar e logar quizzes
+function loadQuizzes() {
+    console.log('✅ Quizzes carregados:');
+    quizConfigs.forEach(quiz => {
+        console.log(`- ${quiz.name}: ${quiz.title} (List ID: ${quiz.listId})`);
     });
+}
 
-    await transporter.sendMail({
-      from: env.SMTP_USER,
-      to: email,
-      cc: env.ADMIN_EMAIL,
-      subject: quiz.subject,
-      html
-    });
-    logger.info(`📨 Email sent to ${email} (quiz: ${quizId})`);
-
-    // 2. Sincronização com ActiveCampaign (usando API Contact Sync)
-    // O endpoint contact/sync já cria ou atualiza o contato e adiciona tags.
-    logger.info(`📌 Applying tag: ${quiz.leadTag} for quizId: ${quizId}`);
-
-    const syncRes = await axios.post(
-      `${env.ACTIVE_CAMPAIGN_API_URL}/api/3/contact/sync`,
-      {
-        contact: {
-          email,
-          firstName: name,
-          // Você pode querer passar lastName aqui se tiver
-          fieldValues: [
-            { field: quiz.activeCampaignFields.scoreFieldId, value: `${score}/${total}` }, // Corrigido para incluir /total
-            { field: quiz.activeCampaignFields.q4FieldId, value: q4 },
-            { field: quiz.activeCampaignFields.whatsappFieldId, value: whatsapp }
-          ]
-        },
-        tags: [quiz.leadTag] // Adiciona a tag de lead
-      },
-      {
-        headers: {
-          'Api-Token': env.ACTIVE_CAMPAIGN_API_KEY,
-          'Content-Type': 'application/json'
-        }
-      }
-    );
-
-    const contactId = syncRes.data?.contact?.id;
-    if (contactId) {
-      // 3. Adiciona o contato à lista principal (se ainda não estiver)
-      // Substitua `list: 5` pelo seu `env.MASTER_LIST_ID` se for usá-lo.
-      // O status 1 (Active) garante que ele esteja na lista.
-      await axios.post(
-        `${env.ACTIVE_CAMPAIGN_API_URL}/api/3/contactLists`,
-        {
-          contactList: {
-            list: 5, // <--- VERIFIQUE E ATUALIZE ESTE ID DE LISTA SE NECESSÁRIO!
-            contact: contactId,
-            status: 1 
-          }
-        },
-        {
-          headers: {
-            'Api-Token': env.ACTIVE_CAMPAIGN_API_KEY,
-            'Content-Type': 'application/json'
-          }
-        }
-      );
-      logger.info(`✅ Contact ${email} added to list ID 5`); // Log com o ID da lista
-    } else {
-      logger.warn(`⚠️ Contact ID not found in sync response for ${email}. Could not add to list.`);
-    }
-
-    res.json({ success: true, message: 'Email sent and ActiveCampaign updated.' });
-  } catch (err) {
-    logger.error('❌ Failed to process quiz result:', err.message, err.stack);
-    // Erros específicos de axios podem ser mais detalhados
-    if (err.response) {
-        logger.error('ActiveCampaign API Error Response:', err.response.data);
-    }
-    res.status(500).json({ success: false, message: 'Failed to send email or update contact.' });
-  }
+// Rota inicial (Health Check)
+app.get('/', (req, res) => {
+    logger.info(`HEAD / (IP: ${req.ip})`);
+    res.status(200).send('Servidor GlowScalePro está online!');
 });
 
-
-// ======================================================================
-// NOVA ROTA: /api/unsubscribe (para o processo de descadastro)
-// Esta rota NÃO usa csrfProtection porque a requisição virá de um domínio externo (MasterTools)
-// e não terá o token CSRF.
-// ======================================================================
+// Rota para o processo de descadastro (NÃO protegida por CSRF)
+// Esta rota é acessada pela página da MasterTools, que não pode fornecer um token CSRF.
 app.post('/api/unsubscribe', async (req, res) => {
-    const { email } = req.body; // O e-mail virá no corpo da requisição POST
+    logger.info(`POST /api/unsubscribe (IP: ${req.ip})`);
+    const { email } = req.body;
+    const LIST_ID_MASTERTOOLS_ALL = process.env.AC_LIST_ID_MASTERTOOLS_ALL;
+    const TAG_ID_UNSUBSCRIBE = process.env.AC_TAG_ID_UNSUBSCRIBE;
 
     if (!email) {
-        logger.warn('Unsubscribe request: Email is missing from request body.');
-        return res.status(400).json({ message: 'Email is required for unsubscribe.' });
+        logger.warn('Unsubscribe: Email not provided.');
+        return res.status(400).json({ success: false, message: 'Email is required.' });
+    }
+
+    if (!LIST_ID_MASTERTOOLS_ALL || !TAG_ID_UNSUBSCRIBE) {
+        logger.error('Unsubscribe: ActiveCampaign List ID or Unsubscribe Tag ID not configured.');
+        return res.status(500).json({ success: false, message: 'Server configuration error for unsubscribe.' });
     }
 
     try {
-        // 1. Encontrar o contato pelo email usando o activeCampaignService
-        const contact = await getContactByEmail(email); 
+        const contactId = await activeCampaignService.findContactByEmail(email);
 
-        if (!contact) {
-            logger.info(`Unsubscribe: Contact not found for email: ${email}. No action needed as contact already non-existent/unsubscribed.`);
-            // Se o contato não for encontrado, ele já não está ativo ou não existe.
-            // Retorna sucesso para o front-end, pois o objetivo de não receber emails foi atingido.
-            return res.status(200).json({ message: 'Unsubscribe processed or contact not found.' });
+        if (!contactId) {
+            logger.info(`Unsubscribe: Contact with email ${email} not found. Sending success response.`);
+            return res.status(200).json({ success: true, message: 'If the email exists, it has been successfully unsubscribed.' });
         }
-        
-        const contactId = contact.id;
-        logger.info(`Unsubscribe: Contact found: ${email}, ID: ${contactId}. Attempting to add unsubscribe tag.`);
 
-        // 2. Adicionar a tag 'descadastro-solicitado' usando o activeCampaignService
-        const tagId = env.AC_UNSUBSCRIBE_TAG_ID; // Pega o ID da tag do .env
-        if (!tagId) {
-            logger.error("Unsubscribe: AC_UNSUBSCRIBE_TAG_ID is not defined in .env. Cannot process request.");
-            return res.status(500).json({ message: 'Server configuration error: Unsubscribe Tag ID missing.' });
+        logger.info(`Unsubscribe: Contact found with ID ${contactId}. Attempting to add unsubscribe tag.`);
+
+        // Adiciona a tag de descadastro
+        const tagAdded = await activeCampaignService.addTagToContact(contactId, TAG_ID_UNSUBSCRIBE);
+        if (tagAdded) {
+            logger.info(`Unsubscribe: Tag ${TAG_ID_UNSUBSCRIBE} added to contact ${contactId}.`);
+        } else {
+            logger.warn(`Unsubscribe: Could not add tag ${TAG_ID_UNSUBSCRIBE} to contact ${contactId}.`);
         }
-        
-        await addTagToContact(contactId, tagId); // Chama a função do serviço
-        logger.info(`Unsubscribe: Tag 'descadastro-solicitado' (${tagId}) successfully added to contact ${contactId}. Automation will handle list removal.`);
 
-        // A automação no ActiveCampaign (gatilho: tag 'descadastro-solicitado' adicionada)
-        // já irá cuidar do processo de descadastro da lista e outras ações.
-        
-        res.status(200).json({ message: 'Unsubscribe request processed successfully.' });
+        // Remove o contato da lista principal (MasterTools - All)
+        const removedFromList = await activeCampaignService.removeContactFromList(contactId, LIST_ID_MASTERTOOLS_ALL);
+        if (removedFromList) {
+            logger.info(`Unsubscribe: Contact ${contactId} removed from list ${LIST_ID_MASTERTOOLS_ALL}.`);
+        } else {
+            logger.warn(`Unsubscribe: Could not remove contact ${contactId} from list ${LIST_ID_MASTERTOOLS_ALL}.`);
+        }
+
+        logger.info(`Unsubscribe: Process completed for ${email}.`);
+        return res.status(200).json({ success: true, message: 'Email successfully unsubscribed.' });
 
     } catch (error) {
-        logger.error('Unsubscribe: Error during process:', error.message, error.stack);
-        // Logar mais detalhes se for um erro de resposta da API (ex: ActiveCampaign)
-        if (error.response) {
-            logger.error('ActiveCampaign API Error Response for Unsubscribe:', error.response.data);
-        }
-        res.status(500).json({ message: 'Internal server error during unsubscribe process.', error: error.message });
+        logger.error(`Unsubscribe: Error processing unsubscribe for ${email}: ${error.message}`, error);
+        return res.status(500).json({ success: false, message: 'Error processing unsubscribe request.' });
     }
 });
 
 
-// ------------------------------------------------------
-// Iniciar Servidor
-// ------------------------------------------------------
-app.listen(PORT, () => {
-  logger.info(`🟢 Server running at http://localhost:${PORT}`);
-  logger.info(`🌍 Environment: \x1b[34m${env.NODE_ENV}\x1b[0m`);
-  logger.info(`🌐 Frontend URL: \x1b[35m${env.FRONTEND_URL}\x1b[0m`);
-  if (env.MASTERTOOLS_UNSUBSCRIBE_URL) {
-    logger.info(`🌐 MasterTools Unsubscribe URL allowed: \x1b[35m${env.MASTERTOOLS_UNSUBSCRIBE_URL}\x1b[0m`);
-  }
-  logger.info(`📧 SMTP User: \x1b[36m${env.SMTP_USER}\x1b[0m`);
-  logger.info(`🔗 ActiveCampaign Base URL: \x1b[32m${env.ACTIVE_CAMPAIGN_API_URL}\x1b[0m`);
+// Rota para processar o quiz e salvar os dados
+app.post('/api/quiz', async (req, res) => {
+    logger.info(`POST /api/quiz (IP: ${req.ip})`);
+    const { email, listName, answers, quizId } = req.body; // Adicione quizId
+    const { acApiUrl, acApiKey } = dataConfig.activeCampaign;
+
+    if (!email || !listName || !answers || !quizId) { // Inclua quizId na validação
+        logger.warn('Quiz: Missing required fields.');
+        return res.status(400).json({ success: false, message: 'Missing required fields: email, listName, answers, quizId.' });
+    }
+
+    const quizConfig = quizConfigs.find(q => q.name === listName || q.id === quizId); // Buscar por name ou id
+    if (!quizConfig) {
+        logger.warn(`Quiz: Quiz configuration not found for listName: ${listName} or quizId: ${quizId}`);
+        return res.status(404).json({ success: false, message: 'Quiz configuration not found.' });
+    }
+
+    try {
+        const contactId = await activeCampaignService.createOrUpdateContact(email, quizConfig.listId);
+        logger.info(`Quiz: Contact ID ${contactId} (email: ${email}) created or updated for list ${quizConfig.listId}.`);
+
+        const hasTag = await activeCampaignService.hasTag(contactId, quizConfig.tagId);
+        if (!hasTag) {
+            const tagAdded = await activeCampaignService.addTagToContact(contactId, quizConfig.tagId);
+            if (tagAdded) {
+                logger.info(`Quiz: Tag ${quizConfig.tagId} added to contact ${contactId}.`);
+            } else {
+                logger.warn(`Quiz: Could not add tag ${quizConfig.tagId} to contact ${contactId}.`);
+            }
+        } else {
+            logger.info(`Quiz: Contact ${contactId} already has tag ${quizConfig.tagId}.`);
+        }
+
+        // Atualizar campos personalizados com as respostas do quiz
+        const customFieldData = quizConfig.questions.map((q, index) => {
+            return {
+                id: q.customFieldId,
+                value: answers[index] || ''
+            };
+        });
+
+        const customFieldsUpdated = await activeCampaignService.updateCustomFields(contactId, customFieldData);
+        if (customFieldsUpdated) {
+            logger.info(`Quiz: Custom fields updated for contact ${contactId}.`);
+        } else {
+            logger.warn(`Quiz: Could not update custom fields for contact ${contactId}.`);
+        }
+
+        res.status(200).json({ success: true, message: 'Dados do quiz salvos com sucesso!' });
+    } catch (error) {
+        logger.error(`Quiz: Error processing quiz for ${email}: ${error.message}`, error);
+        res.status(500).json({ success: false, message: 'Erro ao salvar os dados do quiz.' });
+    }
+});
+
+// Testar conexão SMTP ao iniciar
+transporter.verify(function (error, success) {
+    if (error) {
+        logger.error(`Failed to verify SMTP connection: ${error.message}`);
+    } else {
+        logger.info('✅ Conexão SMTP verificada com sucesso');
+    }
+});
+
+// Inicialização do servidor
+app.listen(port, () => {
+    loadQuizzes();
+    logger.info('Iniciando o servidor...');
+    logger.info(`🚀 Servidor rodando na porta ${port}`);
+    logger.info(`🌎 Ambiente: ${process.env.NODE_ENV || 'development'}`);
+    logger.info(`🔗 Frontend: ${FRONTEND_URL}`);
+    logger.info(`✉️ SMTP: ${SMTP_USER}@${SMTP_HOST}`);
+    logger.info(`📊 ActiveCampaign: ${dataConfig.activeCampaign.acApiKey ? 'Ativo' : 'Inativo'}`);
 });
