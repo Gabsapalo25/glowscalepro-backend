@@ -1,6 +1,6 @@
 import axios from 'axios';
 import dotenv from 'dotenv';
-// CORREÇÃO AQUI: Importa o pacote completo e desestrutura depois
+// Importa o pacote completo e desestrutura depois
 import pkg from 'envalid';
 const { validate, clean, Joi } = pkg;
 import pino from 'pino';
@@ -10,13 +10,17 @@ dotenv.config();
 // Configuração do logger pino
 const logger = pino({
     level: process.env.PINO_LOG_LEVEL || 'info',
-    transport: {
-        target: 'pino-pretty',
-        options: {
-            colorize: true,
-            ignore: 'pid,hostname',
-        },
-    },
+    // CORREÇÃO AQUI: Removemos o bloco 'transport' para evitar o erro de pino-pretty no Render
+    // Para logs formatados localmente, você pode usar um script 'dev' com 'pino-pretty'
+    // ou adicionar o transport condicionalmente (apenas em desenvolvimento).
+    // Para produção no Render, logs JSON são o padrão e são bem processados.
+    // transport: {
+    //     target: 'pino-pretty',
+    //     options: {
+    //         colorize: true,
+    //         ignore: 'pid,hostname',
+    //     },
+    // },
 });
 
 // Validação e limpeza das variáveis de ambiente usando envalid
