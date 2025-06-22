@@ -6,7 +6,7 @@ import { getQuizConfig } from '../config/quizzesConfig.js';
 import { sendEmail } from '../services/emailService.js';
 import sanitizeHtml from 'sanitize-html';
 
-export const sendQuizResult = async (req, res) => {
+export const sendResult = async (req, res) => {
   try {
     const {
       name,
@@ -27,22 +27,23 @@ export const sendQuizResult = async (req, res) => {
 
     // Validação de campos obrigatórios
     if (!sanitizedName || !sanitizedEmail || typeof score === 'undefined' || typeof total === 'undefined' || !quizId) {
-      logger.warn('Campos obrigatórios ausentes ou inválidos');
-      return res.status(400).json({ error: 'Campos obrigatórios ausentes ou inválidos' });
+      logger.warn('Missing or invalid required fields', { quizId, email: sanitizedEmail });
+      return res.status(400).json({ error: 'Missing or invalid required fields' });
     }
 
     // Obter configuração do quiz
     const quizConfig = getQuizConfig(quizId);
     if (!quizConfig) {
-      logger.warn({ quizId }, 'Configuração do quiz não encontrada');
-      return res.status(404).json({ error: 'Quiz não encontrado' });
+      logger.warn('Quiz configuration not found', { quizId });
+      return res.status(404).json({ error: 'Quiz not found' });
     }
 
     // Gerar ID único para o resultado
     const resultId = crypto.randomBytes(16).toString('hex');
-    logger.info({ resultId, quizId }, 'Novo resultado de quiz recebido');
+    logger.info('New quiz result received', { resultId, quizId, email: sanitizedEmail, score });
 
     // Enviar e-mail para o lead
+    logger.info(`Sending email to ${sanitizedEmail} with subject: ${quizConfig.subject}`);
     const emailResult = await sendEmail({
       to: sanitizedEmail,
       subject: quizConfig.subject,
@@ -55,7 +56,7 @@ export const sendQuizResult = async (req, res) => {
         affiliateLink: quizConfig.affiliateLink
       }
     });
-    logger.info({ email: sanitizedEmail, resultId }, '✅ E-mail enviado para o lead');
+    logger.info(`Email sent to ${sanitizedEmail}`, { resultId });
 
     // Notificar admin (se configurado)
     if (process.env.ADMIN_EMAIL) {
@@ -77,7 +78,7 @@ export const sendQuizResult = async (req, res) => {
         subject: `New ${quizId} submission`,
         html: adminHtml
       }).catch(adminEmailError => {
-        logger.warn({ error: adminEmailError.message }, 'Erro ao notificar admin');
+        logger.warn('Failed to notify admin', { error: adminEmailError.message });
       });
     }
 
@@ -87,13 +88,13 @@ export const sendQuizResult = async (req, res) => {
       const lastName = rest.join(' ') || '';
       
       try {
-        // 1. Criar payload com estrutura correta para API v3
+        // Criar payload para API v3
         const contactPayload = {
           contact: {
             email: sanitizedEmail,
-            firstName: firstName,
-            lastName: lastName,
-            phone: `${countryCode}${whatsapp || ''}`, // Campo padrão
+            firstName,
+            lastName,
+            phone: `${countryCode}${whatsapp || ''}`,
             fieldValues: [
               {
                 field: quizConfig.activeCampaignFields.scoreFieldId,
@@ -107,20 +108,21 @@ export const sendQuizResult = async (req, res) => {
           }
         };
 
-        // Adicionar campo personalizado de WhatsApp se existir
-        if (quizConfig.activeCampaignFields.whatsappFieldId) {
+        // Adicionar campo WhatsApp se configurado
+        if (quizConfig.activeCampaignFields.whatsappFieldId && whatsapp) {
           contactPayload.contact.fieldValues.push({
             field: quizConfig.activeCampaignFields.whatsappFieldId,
-            value: `${countryCode}${whatsapp || ''}`
+            value: `${countryCode}${whatsapp}`
           });
         }
 
-        // 2. Configuração SSL adaptativa
+        // Configuração SSL adaptativa
         const httpsAgent = new https.Agent({
           rejectUnauthorized: process.env.NODE_ENV === 'production'
         });
 
-        // 3. Sincronizar contato (POST para /contact/sync)
+        // Sincronizar contato
+        logger.info(`Syncing contact for ${sanitizedEmail} with list ${quizConfig.activeCampaignFields.listId || process.env.AC_LIST_ID_MASTERTOOLS_ALL}`);
         const contactResponse = await axios.post(
           `${process.env.ACTIVE_CAMPAIGN_API_URL}/api/3/contact/sync`,
           contactPayload,
@@ -134,14 +136,15 @@ export const sendQuizResult = async (req, res) => {
         );
 
         const contactId = contactResponse.data.contact.id;
-        logger.info(`Contato criado no AC: ${contactId}`);
+        logger.info(`Contact synced: ${contactId}`, { email: sanitizedEmail });
 
-        // 4. Adicionar à lista
+        // Adicionar à lista
+        const listId = quizConfig.activeCampaignFields.listId || process.env.AC_LIST_ID_MASTERTOOLS_ALL;
         await axios.post(
           `${process.env.ACTIVE_CAMPAIGN_API_URL}/api/3/contactLists`,
           {
             contactList: {
-              list: quizConfig.activeCampaignFields.listId,
+              list: listId,
               contact: contactId,
               status: 1
             }
@@ -154,8 +157,9 @@ export const sendQuizResult = async (req, res) => {
             httpsAgent
           }
         );
+        logger.info(`Contact ${contactId} added to list ${listId}`);
 
-        // 5. Adicionar tag (se existir)
+        // Adicionar tag (se configurado)
         if (quizConfig.leadTag) {
           await axios.post(
             `${process.env.ACTIVE_CAMPAIGN_API_URL}/api/3/contactTags`,
@@ -173,26 +177,24 @@ export const sendQuizResult = async (req, res) => {
               httpsAgent
             }
           );
+          logger.info(`Tag ${quizConfig.leadTag} added to contact ${contactId}`);
         }
 
-        logger.info({ email: sanitizedEmail }, '✅ Contato sincronizado com ActiveCampaign');
-
       } catch (acError) {
-        // LOG DETALHADO COM RESPOSTA DA API
         logger.error({
+          error: acError.message,
           status: acError.response?.status,
           data: acError.response?.data,
           endpoint: acError.config?.url,
-          payload: contactPayload
-        }, 'Erro detalhado no ActiveCampaign');
-        
-        throw new Error('Erro na integração com ActiveCampaign');
+          email: sanitizedEmail
+        }, 'ActiveCampaign integration failed');
+        // Continuar para não interromper a resposta ao usuário
       }
     }
 
-    logger.info(`✅ Resultado processado para ${sanitizedEmail}`);
+    logger.info(`Quiz result processed successfully for ${sanitizedEmail}`, { resultId });
     res.status(200).json({ 
-      message: 'Resultado enviado com sucesso.',
+      message: 'Result sent successfully.',
       resultId
     });
     
@@ -201,13 +203,12 @@ export const sendQuizResult = async (req, res) => {
       error: error.message,
       stack: error.stack,
       body: req.body
-    }, '❌ Erro inesperado no controlador de quiz');
-    res.status(500).json({ error: 'Erro interno no servidor.' });
+    }, 'Unexpected error in quiz controller');
+    res.status(500).json({ error: 'Internal server error.' });
   }
 };
 
-// Middleware para gerar token CSRF
-export const generateCsrfToken = (req, res) => {
+export const getCsrfToken = (req, res) => {
   const csrfToken = crypto.randomBytes(64).toString('hex');
   res.cookie('XSRF-TOKEN', csrfToken, {
     httpOnly: true,

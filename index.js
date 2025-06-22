@@ -39,6 +39,7 @@ app.listen(port, () => {
   logger.info(`🚀 Server running on port ${port}`);
   logger.info(`🌎 Environment: ${process.env.NODE_ENV || 'development'}`);
   logger.info(`🔗 Frontend: ${process.env.FRONTEND_URL || 'not configured'}`);
+  logger.info(`🔒 CORS origin: ${typeof corsOptions.origin === 'function' ? 'dynamic' : corsOptions.origin}`);
   logger.info(`✉️ Admin Email: ${process.env.ADMIN_EMAIL || 'not configured'}`);
   logger.info(`📊 ActiveCampaign: ${process.env.ACTIVE_CAMPAIGN_API_KEY ? 'Active' : 'Inactive'}`);
   if (process.env.ACTIVE_CAMPAIGN_API_KEY) {
