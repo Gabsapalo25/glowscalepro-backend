@@ -1,7 +1,9 @@
 import axios from 'axios';
 import dotenv from 'dotenv';
-import { validate, clean, Joi } from 'envalid'; // Importa 'envalid'
-import pino from 'pino'; // Importa 'pino'
+// CORREÇÃO AQUI: Importa o pacote completo e desestrutura depois
+import pkg from 'envalid';
+const { validate, clean, Joi } = pkg;
+import pino from 'pino';
 
 dotenv.config();
 
