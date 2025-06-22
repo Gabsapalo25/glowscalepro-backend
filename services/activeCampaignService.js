@@ -1,8 +1,9 @@
 import axios from 'axios';
 import dotenv from 'dotenv';
-// Importa o pacote completo e desestrutura depois
-import pkg from 'envalid';
-const { validate, clean, Joi } = pkg;
+// CORREÇÃO AQUI: Importa cleanEnv, str e num diretamente do envalid.
+// Isso usa a API recomendada para versões mais recentes do envalid,
+// eliminando a necessidade de importar Joi separadamente.
+import { cleanEnv, str, num } from 'envalid';
 import pino from 'pino';
 
 dotenv.config();
@@ -10,10 +11,8 @@ dotenv.config();
 // Configuração do logger pino
 const logger = pino({
     level: process.env.PINO_LOG_LEVEL || 'info',
-    // CORREÇÃO AQUI: Removemos o bloco 'transport' para evitar o erro de pino-pretty no Render
-    // Para logs formatados localmente, você pode usar um script 'dev' com 'pino-pretty'
-    // ou adicionar o transport condicionalmente (apenas em desenvolvimento).
-    // Para produção no Render, logs JSON são o padrão e são bem processados.
+    // Não usamos transport: pino-pretty em produção no Render para evitar erros,
+    // os logs serão em JSON e o console do Render os formata.
     // transport: {
     //     target: 'pino-pretty',
     //     options: {
@@ -24,13 +23,14 @@ const logger = pino({
 });
 
 // Validação e limpeza das variáveis de ambiente usando envalid
-const env = clean(validate(process.env, {
-    AC_API_URL: Joi.string().required(),
-    AC_API_KEY: Joi.string().required(),
-    AC_LIST_ID_MASTERTOOLS_ALL: Joi.number().required(),
-    AC_TAG_ID_UNSUBSCRIBE: Joi.number().required(),
+// Usando cleanEnv e os validadores internos do envalid (str, num)
+const env = cleanEnv(process.env, {
+    AC_API_URL: str({ devDefault: 'https://your-activecampaign-dev-url.com' }), // Adicione um valor padrão para desenvolvimento
+    AC_API_KEY: str({ devDefault: 'YOUR_DEV_ACTIVE_CAMPAIGN_API_KEY' }), // Adicione um valor padrão para desenvolvimento
+    AC_LIST_ID_MASTERTOOLS_ALL: num({ devDefault: 12345 }), // Use num() para números, e um default válido para desenvolvimento
+    AC_TAG_ID_UNSUBSCRIBE: num({ devDefault: 67890 }), // Use num() para números, e um default válido para desenvolvimento
     // Adicione outras variáveis de ambiente se houver
-}));
+});
 
 const acApiUrl = env.AC_API_URL;
 const acApiKey = env.AC_API_KEY;
