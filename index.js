@@ -1,4 +1,4 @@
-// src/index.js - VERSÃO COMPLETA E FINAL (ADAPTADA AO SEU quizzesConfig.js)
+// src/index.js - VERSÃO COMPLETA E FINAL (CORRIGIDA: SEM ERRO DE SINTAXE DE MARKDOWN)
 import express from 'express';
 import bodyParser from 'body-parser';
 import cors from 'cors';
@@ -9,7 +9,6 @@ import quizzesRoutes from './routes/quizzesRoutes.js';
 import mailRoutes from './routes/mailRoutes.js';
 import unsubscribeRoutes from './routes/unsubscribeRoutes.js';
 import activeCampaignService from './services/activeCampaignService.js';
-// ATENÇÃO AQUI: Importa 'quizzesConfig' diretamente como um array, não um objeto 'dataConfig'
 import { quizzesConfig } from './config/quizzesConfig.js'; 
 
 dotenv.config();
@@ -20,16 +19,16 @@ const logger = pino({
 
 const app = express();
 
----
-
-### **Validação de TODAS as Variáveis de Ambiente Necessárias**
-
+// Validação de TODAS as Variáveis de Ambiente Necessárias
+// Os nomes das chaves aqui devem corresponder EXATAMENTE aos nomes no Render e no seu .env local.
 const env = cleanEnv(process.env, {
+    // Variáveis gerais do servidor
     PORT: num({ devDefault: 10000 }),
     NODE_ENV: str({ devDefault: 'development' }),
     FRONTEND_URL: str({ devDefault: 'http://localhost:3001' }),
     ALLOWED_ORIGINS: str({ devDefault: 'http://localhost:3001' }),
 
+    // Variáveis do SMTP
     ADMIN_EMAIL: str(),
     SMTP_HOST: str(),
     SMTP_PORT: num(),
@@ -38,16 +37,20 @@ const env = cleanEnv(process.env, {
     SMTP_SECURE: str({ devDefault: 'false' }),
     SMTP_TLS_REJECT_UNAUTHORIZED: str({ devDefault: 'true' }),
 
+    // Variáveis do ActiveCampaign (nomes exatos do Render)
     ACTIVE_CAMPAIGN_API_URL: str(),
     ACTIVE_CAMPAIGN_API_KEY: str(),
     AC_LIST_ID_MASTERTOOLS_ALL: num(), 
     UNSUBSCRIBE_TAG_ID: num(), 
+
+    // Outras variáveis que você possa ter no seu ambiente Render/local
+    // MASTERTOOLS_UNSUBSCRIBE_URL: str({ devDefault: 'http://localhost:3001/unsubscribe' }),
+    // SRC_SECRET: str({ devDefault: 'sua-chave-secreta-padrao' }),
+    // DEV_API_KEY: str({ devDefault: 'chave-dev-opcional' }),
+    // REDIS_URL: str({ devDefault: 'redis://localhost:6379' }),
 });
 
----
-
-### **Configuração do Express e Middlewares**
-
+// Configuração do Express e Middlewares
 app.use(bodyParser.json());
 
 const allowedOrigins = env.ALLOWED_ORIGINS.split(',').map(origin => origin.trim());
@@ -87,10 +90,7 @@ app.use((req, res, next) => {
     next();
 });
 
----
-
-### **Definição de Rotas**
-
+// Definição de Rotas
 app.use('/api', quizzesRoutes);
 app.use('/api', mailRoutes);
 app.use('/api', unsubscribeRoutes);
@@ -99,10 +99,7 @@ app.get('/', (req, res) => {
     res.send('API is running!');
 });
 
----
-
-### **Inicialização do Servidor**
-
+// Inicialização do Servidor
 const PORT = env.PORT;
 
 app.listen(PORT, async () => {
@@ -122,24 +119,16 @@ app.listen(PORT, async () => {
         logger.error(`Detalhes da configuração SMTP: Host=${env.SMTP_HOST}, Port=${env.SMTP_PORT}, User=${env.SMTP_USER}`);
     }
 
-    ---
-
-    ### **Logs da Configuração do ActiveCampaign**
-
+    // Logs da Configuração do ActiveCampaign
     logger.info(`📊 ActiveCampaign: ${env.ACTIVE_CAMPAIGN_API_KEY ? 'Ativo' : 'Inativo'}`);
     logger.info(`   - API URL: ${env.ACTIVE_CAMPAIGN_API_URL}`);
     logger.info(`   - MasterTools List ID: ${env.AC_LIST_ID_MASTERTOOLS_ALL}`);
     logger.info(`   - Unsubscribe Tag ID: ${env.UNSUBSCRIBE_TAG_ID}`);
 
-    ---
-
-    ### **Carregamento e Log dos Quizzes (ADAPTADO À SUA ESTRUTURA)**
-
+    // Carregamento e Log dos Quizzes (ADAPTADO À SUA ESTRUTURA)
     logger.info(`✅ Quizzes carregados:`);
-    // Agora 'quizzesConfig' é o array diretamente
     if (quizzesConfig && Array.isArray(quizzesConfig) && quizzesConfig.length > 0) {
         quizzesConfig.forEach(quiz => {
-            // Usa 'quizId' e 'subject' ou outras propriedades que você tem no seu quizConfig
             logger.info(`- ${quiz.quizId || 'ID Indefinido'}: ${quiz.subject || 'Assunto Indefinido'}`);
         });
     } else {
