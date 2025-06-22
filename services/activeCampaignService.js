@@ -10,41 +10,26 @@ const logger = pino({
 });
 
 // Validação e limpeza das variáveis de ambiente usando envalid
-// CORREÇÃO AQUI: Os nomes das chaves agora correspondem EXATAMENTE aos nomes no Render.
+// As chaves agora correspondem EXATAMENTE aos nomes no Render.
 const env = cleanEnv(process.env, {
-    // Mapeia para ACTIVE_CAMPAIGN_API_URL no Render
     ACTIVE_CAMPAIGN_API_URL: str({ devDefault: 'https://your-activecampaign-dev-url.com' }), 
-    // Mapeia para ACTIVE_CAMPAIGN_API_KEY no Render
     ACTIVE_CAMPAIGN_API_KEY: str({ devDefault: 'YOUR_DEV_ACTIVE_CAMPAIGN_API_KEY' }), 
-    // Esta variável (AC_LIST_ID_MASTERTOOLS_ALL) não foi listada no seu print do Render.
-    // VOCÊ PRECISARÁ ADICIONÁ-LA NO RENDER OU AJUSTAR O NOME AQUI SE JÁ EXISTIR LÁ.
-    // Por enquanto, vou deixá-la como está no seu código original, mas ela será "undefined" se não estiver no Render.
-    AC_LIST_ID_MASTERTOOLS_ALL: num({ devDefault: 12345 }), 
-    // Mapeia para UNSUBSCRIBE_TAG_ID no Render
-    UNSUBSCRIBE_TAG_ID: num({ devDefault: 67890 }), 
-    // Adicione outras variáveis de ambiente se houver e quiser validá-las aqui
+    AC_LIST_ID_MASTERTOOLS_ALL: num({ devDefault: 12345 }), // ID da lista principal. ESTE PRECISA ESTAR NO RENDER.
+    UNSUBSCRIBE_TAG_ID: num({ devDefault: 67890 }), // ID da tag de descadastro. Este está no Render.
 });
 
-// As variáveis locais agora usam os nomes validados do 'env' que correspondem ao Render.
 const acApiUrl = env.ACTIVE_CAMPAIGN_API_URL;
 const acApiKey = env.ACTIVE_CAMPAIGN_API_KEY;
 
-// No service, ao invés de AC_LIST_ID_MASTERTOOLS_ALL e AC_TAG_ID_UNSUBSCRIBE,
-// vamos usar diretamente as do 'env' mapeadas para os nomes do Render.
-// Você precisará atualizar quaisquer chamadas que usem essas variáveis em outros lugares
-// para usar env.AC_LIST_ID_MASTERTOOLS_ALL e env.UNSUBSCRIBE_TAG_ID.
-// Ou, para manter a clareza e evitar alterar outras partes do código,
-// podemos mapeá-las de volta para os nomes originais aqui:
-const acListIdMastertoolsAll = env.AC_LIST_ID_MASTERTOOLS_ALL; // Esta linha dependerá de você ter esta variável no Render
-const acTagIdUnsubscribe = env.UNSUBSCRIBE_TAG_ID;
-
+// Mapeia os nomes validados de volta para os nomes usados no serviço
+const AC_LIST_ID_MASTERTOOLS_ALL = env.AC_LIST_ID_MASTERTOOLS_ALL;
+const AC_TAG_ID_UNSUBSCRIBE = env.UNSUBSCRIBE_TAG_ID;
 
 const headers = {
     'Api-Token': acApiKey,
     'Content-Type': 'application/json',
 };
 
-// Função auxiliar para requisições ActiveCampaign
 const callActiveCampaign = async (method, endpoint, data = null) => {
     try {
         const url = `${acApiUrl}${endpoint}`;
@@ -70,7 +55,7 @@ const callActiveCampaign = async (method, endpoint, data = null) => {
         } else {
             logger.error('Error setting up request:', error.message);
         }
-        throw error; // Propagar o erro para quem chamou
+        throw error;
     }
 };
 
