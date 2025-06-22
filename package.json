@@ -1,36 +1,22 @@
 {
   "name": "glowscalepro-backend",
   "version": "1.0.0",
-  "description": "Backend para o processamento de quizzes e lógica de descadastro para GlowScalePro.",
+  "description": "Backend for GlowscalePro quiz application",
   "main": "index.js",
-  "type": "module",
   "scripts": {
-    "start": "node index.js",
-    "dev": "nodemon index.js"
+    "start": "node index.js"
   },
-  "keywords": [
-    "node",
-    "express",
-    "activecampaign",
-    "quiz",
-    "unsubscribe"
-  ],
-  "author": "Gabsapalo25",
-  "license": "ISC",
   "dependencies": {
-    "activecampaign": "1.0.0",
-    "axios": "^1.6.8",
-    "body-parser": "^1.20.2",
+    "axios": "^1.7.2",
     "cors": "^2.8.5",
     "dotenv": "^16.4.5",
-    "envalid": "^7.0.0",
+    "envalid": "^8.0.0",
     "express": "^4.19.2",
-    "nodemailer": "^6.9.13",
-    "pino": "^8.0.0",
-    "winston": "^3.13.0"
+    "pino": "^9.2.0",
+    "pino-pretty": "^11.2.2",
+    "sanitize-html": "^2.13.0"
   },
-  "devDependencies": {
-    "nodemon": "^3.1.0",
-    "pino-pretty": "^11.0.0" 
-  }
+  "devDependencies": {},
+  "author": "",
+  "license": "ISC"
 }
