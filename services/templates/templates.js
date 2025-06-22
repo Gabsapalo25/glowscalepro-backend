@@ -1,14 +1,14 @@
-// templates.js — COMPLETO e **ATUALIZADO**
+// templates.js — COMPLETO e ATUALIZADO
 // ============================================================================
 // • Mantém identidade única para cada produto
-// • Corrige logo (agora servidor MasterTools) — fundo azul #19265b com altura 220px
-// • Inclui "Unsubscribe" com link clicável para https://glowscalepro-2.funnels.mastertools.com/unsubscribe?email={{email}}
+// • Corrige logo (agora servidor MasterTools) — fundo azul com altura 220 px
+// • Garante link “Unsubscribe” 100 % clicável via %UNSUBSCRIBELINK%
+//   (ActiveCampaign substituirá pelo URL de descadastro)
 // ============================================================================
 
 const LOGO_URL =
   "https://content.app-sources.com/s/406737170044669131/uploads/Images/1-removebg-preview-3444739.png";
 
-// ————————————————————————————————————————————————————————————
 function baseEmailTemplate({
   productName,
   headingColor,
@@ -24,7 +24,7 @@ function baseEmailTemplate({
 
   return `
   <div style="font-family:Segoe UI,Roboto,Helvetica,Arial,sans-serif;max-width:600px;margin:auto;">
-    <div style="background-color:#19265b;padding:24px 0;text-align:center;">
+    <div style="background-color:#1e3a8a;padding:24px 0;text-align:center;">
       <img src="${LOGO_URL}" alt="GlowscalePro Logo" style="max-width:220px;">
     </div>
 
@@ -42,14 +42,16 @@ function baseEmailTemplate({
     </div>
 
     <p style="text-align:center;font-size:12px;color:#888;line-height:1.6;">
-      Want to stop receiving these emails? | <a href="mailto:sac@glowscalepro.com" style="color:#6b7280;text-decoration:underline;">Contact us</a> | <a href="https://glowscalepro-2.funnels.mastertools.com/unsubscribe?email={{email}}" style="color:#e74c3c;text-decoration:underline;">Unsubscribe</a><br>
-      © 2025 GlowscalePro. All rights reserved.
+      Want to stop receiving these emails?<br>
+      <a href="%UNSUBSCRIBELINK%" style="color:#e74c3c;text-decoration:underline;" target="_blank" rel="noopener noreferrer">Unsubscribe</a> |
+      <a href="mailto:sac@glowscalepro.com" style="color:#6b7280;text-decoration:underline;">Contact us</a><br>
+      &copy; 2025 GlowscalePro. All rights reserved.
     </p>
   </div>`;
 }
 
 // ============================== TOKMATE =====================================
-export function generateTokmateEmailContent({ name, score, total, affiliateLink }) {
+function generateTokmateEmailContent({ name, score, total, affiliateLink }) {
   return baseEmailTemplate({
     productName: "TokMate",
     headingColor: "#f59e0b",
@@ -69,7 +71,7 @@ export function generateTokmateEmailContent({ name, score, total, affiliateLink 
 }
 
 // ============================ PRIME BIOME ===================================
-export function generatePrimeBiomeEmailContent({ name, score, total, affiliateLink }) {
+function generatePrimeBiomeEmailContent({ name, score, total, affiliateLink }) {
   return baseEmailTemplate({
     productName: "PrimeBiome",
     headingColor: "#27ae60",
@@ -89,7 +91,7 @@ export function generatePrimeBiomeEmailContent({ name, score, total, affiliateLi
 }
 
 // ============================= PRODENTIM ====================================
-export function generateProdentimEmailContent({ name, score, total, affiliateLink }) {
+function generateProdentimEmailContent({ name, score, total, affiliateLink }) {
   return baseEmailTemplate({
     productName: "ProDentim",
     headingColor: "#3498db",
@@ -110,7 +112,7 @@ export function generateProdentimEmailContent({ name, score, total, affiliateLin
 }
 
 // ============================= NERVOVIVE ====================================
-export function generateNervoViveEmailContent({ name, score, total, affiliateLink }) {
+function generateNervoViveEmailContent({ name, score, total, affiliateLink }) {
   return baseEmailTemplate({
     productName: "NervoVive",
     headingColor: "#9b59b6",
@@ -130,7 +132,7 @@ export function generateNervoViveEmailContent({ name, score, total, affiliateLin
 }
 
 // =========================== TOTAL CONTROL 24 ===============================
-export function generateTotalControlEmailContent({ name, score, total, affiliateLink }) {
+function generateTotalControlEmailContent({ name, score, total, affiliateLink }) {
   return baseEmailTemplate({
     productName: "TotalControl24",
     headingColor: "#e67e22",
@@ -151,7 +153,7 @@ export function generateTotalControlEmailContent({ name, score, total, affiliate
 }
 
 // ============================ GLUCOSHIELD ===================================
-export function generateGlucoShieldEmailContent({ name, score, total, affiliateLink }) {
+function generateGlucoShieldEmailContent({ name, score, total, affiliateLink }) {
   return baseEmailTemplate({
     productName: "GlucoShield Pro",
     headingColor: "#16a085",
@@ -171,7 +173,7 @@ export function generateGlucoShieldEmailContent({ name, score, total, affiliateL
 }
 
 // ============================== PROSTADINE ==================================
-export function generateProstadineEmailContent({ name, score, total, affiliateLink }) {
+function generateProstadineEmailContent({ name, score, total, affiliateLink }) {
   return baseEmailTemplate({
     productName: "Prostadine",
     headingColor: "#c0392b",
@@ -189,5 +191,16 @@ export function generateProstadineEmailContent({ name, score, total, affiliateLi
     ctaText: "Protect Prostate Health"
   });
 }
-// ============================================================================
-// Fim do arquivo templates.js
+
+// ============================== EXPORTS =====================================
+// Exporta um objeto contendo todas as funções de template para serem acessadas
+// via import default (ex: import templates from '...');
+export const templates = { // Changed from `export default` to `export const`
+    tokmateEmailTemplate: generateTokmateEmailContent,
+    primeBiomeEmailTemplate: generatePrimeBiomeEmailContent,
+    prodentimEmailTemplate: generateProdentimEmailContent,
+    nervoviveEmailTemplate: generateNervoViveEmailContent,
+    totalcontrol24EmailTemplate: generateTotalControlEmailContent,
+    glucoshieldEmailTemplate: generateGlucoShieldEmailContent,
+    prostadineEmailTemplate: generateProstadineEmailContent,
+};
