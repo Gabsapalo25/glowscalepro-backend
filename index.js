@@ -1,72 +1,94 @@
-// index.js (CONTEÚDO FINAL E DEFINITIVO)
+// index.js
 
+import 'dotenv/config'; // Garante que as variáveis de ambiente sejam carregadas primeiro
 import express from 'express';
-import dotenv from 'dotenv';
-import pino from 'pino';
+import cors from 'cors';
 import helmet from 'helmet';
-import cors from 'cors'; // Já está no projeto
-import rateLimit from 'express-rate-limit'; // Já está no projeto
-
-// Importe os middlewares e rotas do seu projeto - CAMINHOS ABSOLUTOS (A PARTIR DA RAIZ)
-// Assumindo:
-// - index.js está na raiz
-// - pastas 'middleware', 'routes', 'controllers', 'services', 'config' estão na raiz
-import { configureCors, configureRateLimit, devAuthMiddleware, logRequest } from './middleware/quizMiddleware.js';
-import errorHandler from './middleware/errorHandler.js';
-import { validateQuizPayload } from './middleware/validateQuizPayload.js'; // Middleware de validação do payload do quiz
-// Importe as rotas do seu projeto
-import quizzesRoutes from './routes/quizzesRoutes.js';
-import mailRoutes from './routes/mailRoutes.js';
-import unsubscribeRoutes from './routes/unsubscribeRoutes.js';
-
-dotenv.config();
+import rateLimit from 'express-rate-limit';
+import quizRoutes from './routes/quizRoutes.js';
+import { notFound, errorHandler } from './middleware/errorHandler.js';
+import logger, { addRequestId } from './utils/logger.js'; // Importa o logger e o middleware addRequestId
+import csurf from 'csurf';
+import cookieParser from 'cookie-parser';
 
 const app = express();
-const logger = pino();
 
-// Configurações e Middlewares Globais
-app.use(express.json()); // Body parser para JSON
-app.use(express.urlencoded({ extended: true })); // Body parser para URL-encoded
-app.use(helmet()); // Segurança HTTP headers
+// Configurações de segurança e middlewares
+app.use(express.json()); // Permite que o Express leia JSON no corpo das requisições
+app.use(express.urlencoded({ extended: true })); // Permite ler dados de formulário codificados em URL
 
-// Configurações de ambiente para e-mail (necessário para mailService)
-app.locals.adminEmail = process.env.ADMIN_EMAIL || 'defaultadmin@example.com';
-app.locals.smtpConfig = {
-    host: process.env.SMTP_HOST,
-    port: parseInt(process.env.SMTP_PORT || '587', 10),
-    secure: process.env.SMTP_SECURE === 'true', // Garante que é booleano
-    auth: {
-        user: process.env.SMTP_USER,
-        pass: process.env.SMTP_PASS,
+// Configuração do CORS
+// Apenas allow origin para a sua URL de frontend ou para localhost em desenvolvimento
+const allowedOrigins = [
+    process.env.FRONTEND_URL,
+    process.env.MASTERTOOLS_UNSUBSCRIBE_URL, // Adicionar esta URL, se for diferente
+    'http://localhost:3000', // Para desenvolvimento local do frontend
+    'http://localhost:5173'  // Para Vue/Vite em desenvolvimento local
+];
+
+app.use(cors({
+    origin: (origin, callback) => {
+        // Permitir requisições sem 'origin' (ex: de ferramentas como Postman, ou requisições same-origin)
+        if (!origin) return callback(null, true);
+        if (allowedOrigins.includes(origin)) {
+            return callback(null, true);
+        }
+        const msg = `The CORS policy for this site does not allow access from the specified Origin: ${origin}`;
+        logger.warn(msg); // Usando o logger centralizado
+        return callback(new Error(msg), false);
     },
-};
+    methods: ['GET', 'POST', 'PUT', 'DELETE'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-CSRF-Token'],
+    credentials: true,
+}));
 
-// Aplica CORS e Rate Limiting usando as funções importadas do quizMiddleware
-// Estas funções configuram os middlewares no 'app' globalmente
-configureCors(app, process.env);
-configureRateLimit(app);
+// Configuração do Helmet para segurança de HTTP headers
+app.use(helmet());
 
-// Middlewares aplicados globalmente a todas as requisições
-app.use(logRequest); // Para logar todas as requisições
-app.use(devAuthMiddleware); // Autenticação para ambiente de desenvolvimento (se NODE_ENV='development')
+// Configuração de Rate Limiting para evitar ataques de força bruta ou DDoS
+const limiter = rateLimit({
+    windowMs: 15 * 60 * 1000, // 15 minutos
+    max: 100, // Limite de 100 requisições por IP a cada 15 minutos
+    message: 'Too many requests from this IP, please try again after 15 minutes',
+    standardHeaders: true, // Retorna as informações de limite nas headers RateLimit-*
+    legacyHeaders: false, // Desabilita as headers X-RateLimit-*
+});
+app.use(limiter);
+
+// Middleware para cookies (necessário para csurf)
+app.use(cookieParser());
+
+// Middleware para CSRF protection (deve vir DEPOIS de cookieParser e express.json/urlencoded)
+const csrfProtection = csurf({
+    cookie: {
+        key: '_csrf',
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production', // Use secure cookies em produção
+        maxAge: 3600 // 1 hora
+    },
+});
+app.use(csrfProtection); // Aplicar proteção CSRF a todas as rotas ou rotas específicas
+
+// Middleware para adicionar um ID de requisição ao logger de cada requisição
+app.use(addRequestId);
 
 // Rotas da API
-// As rotas são montadas sob o prefixo '/api'
-// Note que 'validateQuizPayload' será aplicado dentro de 'quizzesRoutes.js'
-app.use('/api', quizzesRoutes);
-app.use('/api', mailRoutes);
-app.use('/api', unsubscribeRoutes);
+app.use('/api', quizRoutes);
 
-// Rota de Teste Simples para verificar se a API está no ar
+// Rota de teste simples para verificar se o servidor está online
 app.get('/', (req, res) => {
-    res.status(200).send('API is running!');
+    logger.info('📥 GET / - Root endpoint accessed.'); // Usando o logger centralizado
+    res.status(200).send('GlowScalePro Backend API is running!');
 });
 
-// Middleware de tratamento de erros global (DEVE SER O ÚLTIMO MIDDLEWARE ADICIONADO)
+// Middleware para lidar com rotas não encontradas (404)
+app.use(notFound);
+
+// Middleware de tratamento de erros global (deve ser o último app.use)
 app.use(errorHandler);
 
-const PORT = process.env.PORT || 3000;
-
+// Inicialização do servidor
+const PORT = process.env.PORT || 10000;
 app.listen(PORT, () => {
-    logger.info(`Server running on port ${PORT}`);
+    logger.info(`Server running on port ${PORT}`); // Usando o logger centralizado
 });

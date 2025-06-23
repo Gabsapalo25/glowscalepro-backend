@@ -1,55 +1,42 @@
 // services/emailService.js
 import nodemailer from 'nodemailer';
-import pino from 'pino';
+import pino from 'pino'; // Mantenha esta importação para o 'env' logger se for necessário para depuração da validação
 import { cleanEnv, str, port, bool } from 'envalid';
+import logger from '../utils/logger.js'; // Importa o logger centralizado
 
-// Validação das variáveis de ambiente
+// Validação das variáveis de ambiente usando envalid
 const env = cleanEnv(process.env, {
-  SMTP_HOST: str(), // VOLTOU A SER SMTP_HOST
-  SMTP_PORT: port(), // VOLTOU A SER SMTP_PORT
-  SMTP_SECURE: bool(), // VOLTOU A SER SMTP_SECURE
-  SMTP_USER: str(), // VOLTOU A SER SMTP_USER
-  SMTP_PASS: str(), // VOLTOU A SER SMTP_PASS
-  // SMTP_TLS_REJECT_UNAUTHORIZED: bool() // Removido, pois não é usado explicitamente na classe
-});
-
-// Configuração do logger (com a condição do pino-pretty que aprendemos)
-const logger = pino({
-    level: process.env.NODE_ENV === 'production' ? 'info' : 'debug',
-    // Apenas adicione transport se NÃO for ambiente de produção
-    ...(process.env.NODE_ENV !== 'production' && {
-        transport: {
-            target: 'pino-pretty',
-            options: {
-                colorize: true,
-                ignore: 'pid,hostname',
-            },
-        },
-    }),
+  SMTP_HOST: str(),
+  SMTP_PORT: port(),
+  SMTP_SECURE: bool(),
+  SMTP_USER: str(),
+  SMTP_PASS: str(),
+  // SMTP_TLS_REJECT_UNAUTHORIZED: bool({ default: false }) // Descomente e use se precisar desta validação
 });
 
 class EmailService {
-  // O construtor agora recebe a config de SMTP diretamente do quizController (process.env.EMAIL_...)
-  // Mas o transporter ainda vai usar as variáveis globais 'env' (SMTP_...)
-  constructor(smtpConfig) {
+  constructor() {
     this.transporter = nodemailer.createTransport({
-      host: env.SMTP_HOST, // Usando as variáveis limpas de 'env'
+      host: env.SMTP_HOST,
       port: env.SMTP_PORT,
       secure: env.SMTP_SECURE,
       auth: {
         user: env.SMTP_USER,
         pass: env.SMTP_PASS
       },
+      // Descomente e ajuste conforme necessário se usar SMTP_TLS_REJECT_UNAUTHORIZED
       // tls: {
-      //   rejectUnauthorized: env.SMTP_TLS_REJECT_UNAUTHORIZED // Adicione se estiver a usar e se for 'true' em produção
+      //   rejectUnauthorized: env.SMTP_TLS_REJECT_UNAUTHORIZED
       // }
     });
 
     // Verificação inicial do transporter
     this.transporter.verify((error) => {
       if (error) {
+        // Usa o logger centralizado
         logger.error(`❌ SMTP connection error: ${error.message}`);
       } else {
+        // Usa o logger centralizado
         logger.info('✅ SMTP server connected successfully');
       }
     });
@@ -58,21 +45,23 @@ class EmailService {
   async sendEmail({ from, to, subject, html, text }) {
     try {
       const mailOptions = {
-        from: from || `"GlowscalePro" <${env.SMTP_USER}>`, // Usando SMTP_USER do env
+        from: from || `"GlowscalePro" <${env.SMTP_USER}>`,
         to,
         subject,
         html,
-        text: text || html.replace(/<[^>]*>/g, ''),
+        text: text || html.replace(/<[^>]*>/g, ''), // Fallback para text/plain
         headers: {
-          'List-Unsubscribe': '<https://glowscalepro.com/unsubscribe>',
+          'List-Unsubscribe': '<https://glowscalepro.com/unsubscribe>', // Ajuste para o seu domínio real
           'X-Mailer': 'GlowscaleProMailer/1.0'
         }
       };
 
       await this.transporter.sendMail(mailOptions);
+      // Usa o logger centralizado
       logger.info(`✅ Email sent successfully to: ${to}`);
     } catch (error) {
-      logger.error(`❌ Failed to send email to ${to}: ${error.message}`);
+      // Usa o logger centralizado
+      logger.error({ error: error.message, to }, `❌ Failed to send email to ${to}`);
       throw new Error(`Email sending failed: ${error.message}`);
     }
   }

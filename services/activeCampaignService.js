@@ -1,275 +1,156 @@
 // services/activeCampaignService.js
 
 import axios from 'axios';
-import pino from 'pino';
-
-// Configuração do logger
-const logger = pino({
-    level: process.env.NODE_ENV === 'production' ? 'info' : 'debug',
-    // NOVO: Apenas adicione transport se NÃO for ambiente de produção
-    ...(process.env.NODE_ENV !== 'production' && {
-        transport: {
-            target: 'pino-pretty',
-            options: {
-                colorize: true,
-                ignore: 'pid,hostname',
-            },
-        },
-    }),
-});
+import logger from '../utils/logger.js'; // Importa o logger centralizado
 
 class ActiveCampaignService {
     constructor(apiUrl, apiKey) {
+        if (!apiUrl || !apiKey) {
+            logger.warn('⚠️ ActiveCampaignService initialized without API URL or Key. Operations will be skipped.');
+            this.isEnabled = false;
+            return;
+        }
+
         this.apiUrl = apiUrl;
         this.apiKey = apiKey;
-        this.api = axios.create({
+        this.axiosInstance = axios.create({
             baseURL: `${this.apiUrl}/api/3`,
             headers: {
                 'Api-Token': this.apiKey,
                 'Content-Type': 'application/json',
             },
         });
+        this.isEnabled = true;
+        logger.info('✅ ActiveCampaignService initialized successfully.');
     }
 
-    /**
-     * Procura um contato pelo email.
-     * @param {string} email
-     * @returns {Promise<object|null>} O objeto do contato se encontrado, ou null.
-     */
-    async getContactByEmail(email) {
-        logger.debug(`Searching for contact with email: ${email}`);
-        try {
-            const response = await this.api.get(`/contacts?email=${email}`);
-            if (response.data && response.data.contacts.length > 0) {
-                logger.info(`Contact found: ${response.data.contacts[0].id}`);
-                return response.data.contacts[0];
-            }
-            logger.info(`Contact with email ${email} not found.`);
+    async request(method, endpoint, data = null) {
+        if (!this.isEnabled) {
+            logger.debug(`⏩ ActiveCampaign operation skipped: ${method} ${endpoint} (Service not enabled).`);
             return null;
+        }
+        try {
+            const config = { method, url: endpoint, data };
+            logger.debug(`⚡ ActiveCampaign API Request: ${method} ${endpoint}`);
+            const response = await this.axiosInstance(config);
+            logger.debug(`✅ ActiveCampaign API Response for ${endpoint}: Status ${response.status}`);
+            return response.data;
         } catch (error) {
-            logger.error(`Error searching for contact ${email}: ${error.message}`);
-            // Log do erro detalhado da API do ActiveCampaign, se disponível
             if (error.response) {
                 logger.error({
                     status: error.response.status,
                     data: error.response.data,
                     headers: error.response.headers,
-                }, `Response data for getContactByEmail error:`);
+                    endpoint: endpoint,
+                }, `❌ ActiveCampaign API Error for ${endpoint}: ${error.response.statusText}`);
+            } else if (error.request) {
+                logger.error({ request: error.request, endpoint: endpoint }, `❌ ActiveCampaign API No Response for ${endpoint}`);
+            } else {
+                logger.error({ message: error.message, endpoint: endpoint }, `❌ ActiveCampaign API Request Setup Error for ${endpoint}`);
             }
-            throw new Error(`Failed to search for contact: ${error.message}`);
+            throw new Error(`ActiveCampaign API Error: ${error.message}`);
         }
     }
 
-    /**
-     * Cria um novo contato no ActiveCampaign.
-     * @param {string} email
-     * @param {string} [firstName='']
-     * @param {string} [lastName='']
-     * @returns {Promise<object>} O objeto do novo contato.
-     */
-    async createContact(email, firstName = '', lastName = '') {
-        logger.info(`Creating new contact: ${email}`);
-        try {
-            const response = await this.api.post('/contacts', {
-                contact: { email, firstName, lastName }
-            });
-            logger.info(`New contact created: ${response.data.contact.id}`);
-            return response.data.contact;
-        } catch (error) {
-            logger.error(`Error creating contact ${email}: ${error.message}`);
-            if (error.response) {
-                logger.error({
-                    status: error.response.status,
-                    data: error.response.data,
-                }, `Response data for createContact error:`);
-            }
-            throw new Error(`Failed to create contact: ${error.message}`);
-        }
-    }
+    async createOrUpdateContactAndFields(email, listId, customFields = [], firstName = '', lastName = '') {
+        if (!this.isEnabled) return null;
 
-    /**
-     * Adiciona um contato a uma lista.
-     * @param {string} contactId
-     * @param {string} listId
-     * @returns {Promise<object>} O objeto de status da lista.
-     */
-    async addContactToList(contactId, listId) {
-        logger.info(`Attempting to add contact ${contactId} to list ${listId}.`);
+        let contactData = {
+            contact: {
+                email: email,
+                firstName: firstName,
+                lastName: lastName,
+            }
+        };
+
         try {
-            const response = await this.api.post('/contactLists', {
+            logger.debug(`Searching for contact with email: ${email}`);
+            const searchResponse = await this.request('GET', `/contacts?email=${email}`);
+            let contactId;
+
+            if (searchResponse && searchResponse.contacts && searchResponse.contacts.length > 0) {
+                contactId = searchResponse.contacts[0].id;
+                logger.info(`Contact found: ${email} (ID: ${contactId}). Updating...`);
+                // Update existing contact
+                await this.request('PUT', `/contacts/${contactId}`, contactData);
+            } else {
+                logger.info(`Contact not found: ${email}. Creating new contact...`);
+                // Create new contact
+                const createResponse = await this.request('POST', '/contacts', contactData);
+                contactId = createResponse.contact.id;
+            }
+
+            // Ensure contact is associated with the list
+            logger.debug(`Adding contact ${contactId} to list ${listId}...`);
+            await this.request('POST', '/contactLists', {
                 contactList: {
                     list: listId,
                     contact: contactId,
-                    status: 1 // 1 = subscribed
+                    status: 1 // 1 for active
                 }
             });
-            logger.info(`Contact ${contactId} successfully added/subscribed to list ${listId}.`);
-            return response.data.contactList;
-        } catch (error) {
-            logger.error(`Error adding contact ${contactId} to list ${listId}: ${error.message}`);
-            if (error.response) {
-                logger.error({
-                    status: error.response.status,
-                    data: error.response.data,
-                }, `Response data for addContactToList error:`);
-            }
-            throw new Error(`Failed to add contact to list: ${error.message}`);
-        }
-    }
 
-    /**
-     * Obtém o status de um contato em uma lista.
-     * @param {string} contactId
-     * @param {string} listId
-     * @returns {Promise<object|null>} O objeto contactList se encontrado, ou null.
-     */
-    async getContactListStatus(contactId, listId) {
-        logger.debug(`Getting list status for contact ${contactId} on list ${listId}.`);
-        try {
-            const response = await this.api.get(`/contactLists?contact=${contactId}&list=${listId}`);
-            if (response.data && response.data.contactLists.length > 0) {
-                return response.data.contactLists[0];
-            }
-            return null;
-        } catch (error) {
-            logger.error(`Error getting contact list status ${contactId} on list ${listId}: ${error.message}`);
-            if (error.response) {
-                logger.error({
-                    status: error.response.status,
-                    data: error.response.data,
-                }, `Response data for getContactListStatus error:`);
-            }
-            throw new Error(`Failed to get contact list status: ${error.message}`);
-        }
-    }
-
-    /**
-     * Adiciona uma tag a um contato.
-     * @param {string} contactId
-     * @param {number} tagId O ID numérico da tag no ActiveCampaign.
-     * @returns {Promise<object>} O objeto contactTag.
-     */
-    async addTagToContact(contactId, tagId) {
-        logger.info(`Attempting to add tag ${tagId} to contact ${contactId}.`);
-        try {
-            const response = await this.api.post('/contactTags', {
-                contactTag: {
-                    contact: contactId,
-                    tag: tagId
-                }
-            });
-            logger.info(`Tag ${tagId} successfully added to contact ${contactId}.`);
-            return response.data.contactTag;
-        } catch (error) {
-            logger.error(`Error adding tag ${tagId} to contact ${contactId}: ${error.message}`);
-            if (error.response) {
-                logger.error({
-                    status: error.response.status,
-                    data: error.response.data,
-                }, `Response data for addTagToContact error:`);
-            }
-            // Não relance o erro se a tag já existir para evitar falha no fluxo.
-            // O código 422 é geralmente para "Unprocessable Entity", pode indicar duplicação.
-            if (error.response && error.response.status === 422 && error.response.data.errors && error.response.data.errors[0].code === 'duplicate') {
-                logger.warn(`Tag ${tagId} already exists for contact ${contactId}. Skipping.`);
-                return { status: 'already_exists' }; // Retorna um status indicando que já existe
-            }
-            throw new Error(`Failed to add tag ${tagId} to contact ${contactId}: ${error.message}`);
-        }
-    }
-
-    /**
-     * **ATUALIZAÇÃO IMPORTANTE AQUI:**
-     * Esta função agora obtém ou cria o contato, adiciona à lista e, em uma única operação,
-     * atualiza os campos personalizados.
-     * Isso resolve o problema de tentar dar PUT em um fieldValueId que não existe para novos contatos.
-     *
-     * @param {string} email
-     * @param {string} listId
-     * @param {Array<object>} customFields Array de objetos { fieldId: string, value: string }
-     * @param {string} [firstName='']
-     * @param {string} [lastName='']
-     * @returns {Promise<string>} O ID do contato criado ou atualizado.
-     */
-    async createOrUpdateContactAndFields(email, listId, customFields = [], firstName = '', lastName = '') {
-        logger.info(`Attempting to create or update contact for email: ${email} on list ID: ${listId}`);
-        let contact;
-        let contactId;
-        let isNewContact = false;
-
-        try {
-            contact = await this.getContactByEmail(email);
-
-            if (contact) {
-                contactId = contact.id;
-                logger.info(`Contact found: ${contactId}. Updating existing contact.`);
-                // Se o contato existe, prepara os dados para atualização (incluindo campos personalizados)
-                // A API do ActiveCampaign permite enviar fieldValues junto com a atualização do contato.
-                const updateData = {
-                    contact: {
-                        email,
-                        firstName,
-                        lastName,
+            // Update custom fields
+            if (customFields.length > 0) {
+                for (const field of customFields) {
+                    if (field.fieldId && field.value !== undefined && field.value !== null) {
+                        logger.debug(`Updating custom field ${field.fieldId} for contact ${contactId} with value: ${field.value}`);
+                        await this.request('POST', '/fieldValues', {
+                            fieldValue: {
+                                contact: contactId,
+                                field: field.fieldId,
+                                value: String(field.value), // Ensure value is a string
+                            }
+                        });
+                    } else {
+                         logger.warn(`Skipping invalid custom field for contact ${contactId}: ${JSON.stringify(field)}`);
                     }
-                };
-
-                if (customFields && customFields.length > 0) {
-                    updateData.contact.fieldValues = customFields.map(field => ({
-                        field: field.fieldId, // ID do campo personalizado
-                        value: field.value,
-                    }));
                 }
-
-                const response = await this.api.put(`/contacts/${contactId}`, updateData);
-                contact = response.data.contact; // Atualiza o objeto do contato com a resposta
-                logger.info(`Contact ${contactId} updated with custom fields.`);
-
-            } else {
-                logger.info(`Contact ${email} not found. Creating new contact.`);
-                // Se o contato não existe, cria um novo (incluindo campos personalizados no payload inicial)
-                isNewContact = true;
-                const createData = {
-                    contact: {
-                        email,
-                        firstName,
-                        lastName,
-                    }
-                };
-
-                if (customFields && customFields.length > 0) {
-                    createData.contact.fieldValues = customFields.map(field => ({
-                        field: field.fieldId, // ID do campo personalizado
-                        value: field.value,
-                    }));
-                }
-
-                const response = await this.api.post('/contacts', createData);
-                contact = response.data.contact;
-                contactId = contact.id;
-                logger.info(`New contact created: ${contactId} with custom fields.`);
             }
-
-            // Garante que o contato está na lista (se não estiver, adiciona)
-            const contactListStatus = await this.getContactListStatus(contactId, listId);
-            if (!contactListStatus || contactListStatus.status !== '1') {
-                logger.info(`Adding contact ${contactId} to list ${listId}.`);
-                await this.addContactToList(contactId, listId);
-            } else {
-                logger.info(`Contact ${contactId} already subscribed to list ${listId}.`);
-            }
-
+            logger.info(`Contact ${contactId} created/updated and fields processed successfully.`);
             return contactId;
 
         } catch (error) {
-            logger.error(`Error in createOrUpdateContactAndFields for ${email}: ${error.message}`);
-            if (error.response) {
-                logger.error({
-                    status: error.response.status,
-                    data: error.response.data,
-                    headers: error.response.headers,
-                }, `Response data for createOrUpdateContactAndFields error:`);
+            logger.error({ email, listId, customFields, firstName, error_message: error.message }, '❌ Error in createOrUpdateContactAndFields');
+            throw error;
+        }
+    }
+
+    async addTagToContact(contactId, tagId) {
+        if (!this.isEnabled) return null;
+        try {
+            logger.debug(`Adding tag ${tagId} to contact ${contactId}`);
+            await this.request('POST', '/contactTags', {
+                contactTag: {
+                    contact: contactId,
+                    tag: tagId,
+                },
+            });
+            logger.info(`Tag ${tagId} added to contact ${contactId}.`);
+        } catch (error) {
+            logger.error({ contactId, tagId, error_message: error.message }, '❌ Error adding tag to contact');
+            throw error;
+        }
+    }
+
+    async removeTagFromContact(contactId, tagId) {
+        if (!this.isEnabled) return null;
+        try {
+            // ActiveCampaign API doesn't have a direct "remove by contact and tag ID".
+            // You usually delete the contactTag association.
+            // First, find the contactTag ID
+            const response = await this.request('GET', `/contactTags?contact=${contactId}&tag=${tagId}`);
+            if (response && response.contactTags && response.contactTags.length > 0) {
+                const contactTagId = response.contactTags[0].id;
+                logger.debug(`Removing contactTag ${contactTagId} for contact ${contactId} and tag ${tagId}`);
+                await this.request('DELETE', `/contactTags/${contactTagId}`);
+                logger.info(`Tag ${tagId} removed from contact ${contactId}.`);
+            } else {
+                logger.warn(`Tag ${tagId} not found for contact ${contactId}. No action taken.`);
             }
-            throw new Error(`Failed to process contact: ${error.message}`);
+        } catch (error) {
+            logger.error({ contactId, tagId, error_message: error.message }, '❌ Error removing tag from contact');
+            throw error;
         }
     }
 }

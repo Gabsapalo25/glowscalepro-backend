@@ -1,80 +1,52 @@
-// middleware/quizMiddleware.js (CONTEÚDO FINAL E DEFINITIVO)
+// middleware/errorHandler.js
 
-import crypto from 'crypto';
-import pino from 'pino';
-import rateLimit from 'express-rate-limit';
-import cors from 'cors';
+import logger from '../utils/logger.js'; // Importa o logger centralizado
 
-const logger = pino();
-const csrfTokens = new Set();
+export const notFound = (req, res, next) => {
+    // Tenta usar o logger da requisição (com requestId) se disponível, senão o global
+    const requestLogger = req.log || logger;
+    const error = new Error(`Not Found - ${req.originalUrl}`);
+    requestLogger.warn(`⚠️ 404 Not Found: ${req.originalUrl}`);
+    res.status(404);
+    next(error);
+};
 
-export function generateCsrfToken(req, res, next) {
-  const token = crypto.randomUUID();
-  csrfTokens.add(token);
-  setTimeout(() => {
-    if (csrfTokens.has(token)) {
-      csrfTokens.delete(token);
-      logger.info(`🗑️ Token removido por expiração: ${token}`);
+export const errorHandler = (err, req, res, next) => {
+    // Tenta usar o logger da requisição (com requestId) se disponível, senão o global
+    const requestLogger = req.log || logger;
+
+    let statusCode = res.statusCode === 200 ? 500 : res.statusCode;
+    let message = err.message;
+
+    // Se for um erro de validação (ex: Joi) ou erro de CSRF
+    if (err.name === 'ValidationError') {
+        statusCode = 400;
+        message = err.details ? err.details.map(i => i.message).join(', ') : err.message;
+        requestLogger.error({ error: err, statusCode, message }, '🚫 Validation Error');
+    } else if (err.code === 'EBADCSRFTOKEN') {
+        statusCode = 403; // Forbidden
+        message = 'Invalid CSRF token.';
+        requestLogger.error({ error: err, statusCode, message }, '🚫 CSRF Token Error');
+    } else if (err.isJoi) { // Se você estiver usando Joi para validação
+        statusCode = 400;
+        message = err.details.map(el => el.message).join('; ');
+        requestLogger.error({ error: err, statusCode, message }, '🚫 Joi Validation Error');
     }
-  }, 3600 * 1000); // 1 hora
-  req.csrfToken = token;
-  res.json({ csrfToken: token });
-}
+    
+    // Log do erro com detalhes completos
+    requestLogger.error({
+        error_name: err.name,
+        error_message: message,
+        stack: process.env.NODE_ENV === 'production' ? '🥞 Stack trace in production suppressed.' : err.stack,
+        request_url: req.originalUrl,
+        request_method: req.method,
+        // Incluir outros dados relevantes se existirem (ex: req.body, req.params)
+    }, `❌ Global Error Handler: ${message}`);
 
-export function csrfProtection(req, res, next) {
-  const csrfToken = req.body.csrfToken || req.headers['x-csrf-token'];
-  if (!csrfToken) {
-    logger.warn('🚫 Missing CSRF token in request headers or body');
-    return res.status(403).json({ error: 'Missing CSRF token' });
-  }
-  if (csrfTokens.has(csrfToken)) {
-    csrfTokens.delete(csrfToken); // Token válido é usado e removido para evitar reuso
-    logger.info(`🔓 Token válido usado: ${csrfToken}`);
-    return next();
-  } else {
-    logger.warn(`❌ Token inválido ou expirado: ${csrfToken}`);
-    return res.status(403).json({ error: 'Invalid or expired CSRF token' });
-  }
-}
 
-// **IMPORTANTE: A função 'validateQuizPayload' FOI REMOVIDA DESTE ARQUIVO!**
-// Ela deve existir APENAS no arquivo 'middleware/validateQuizPayload.js'.
-
-export function configureCors(app, env) {
-  app.use(cors({
-    origin: env.FRONTEND_URL,
-    credentials: true,
-    allowedHeaders: ['Content-Type', 'Authorization', 'X-CSRF-Token']
-  }));
-}
-
-export function configureRateLimit(app) {
-  const apiLimiter = rateLimit({
-    windowMs: 15 * 60 * 1000, // 15 minutos
-    max: 100, // Limite de 100 requisições por IP em 15 minutos
-    message: { error: 'Too many requests. Please try again later.' }
-  });
-  // Aplica o rate limit a rotas específicas ou a um prefixo de rota
-  // Se '/api' é o prefixo global e a rota do quiz é '/submit-quiz', o caminho completo é '/api/submit-quiz'
-  app.use('/api/submit-quiz', apiLimiter);
-}
-
-export function devAuthMiddleware(req, res, next) {
-  if (process.env.NODE_ENV === 'development' && process.env.DEV_API_KEY) {
-    const apiKey = req.headers['x-api-key'];
-    if (!apiKey || apiKey !== process.env.DEV_API_KEY) {
-      logger.warn('❌ Unauthorized access attempt: Invalid DEV_API_KEY');
-      return res.status(401).json({ error: 'Unauthorized: Invalid DEV_API_KEY' });
-    }
-  }
-  next();
-}
-
-export function logRequest(req, res, next) {
-  logger.info(`📥 ${req.method} ${req.url}`, {
-    ip: req.ip,
-    userAgent: req.get('User-Agent'),
-    body: req.body
-  });
-  next();
-}
+    res.status(statusCode).json({
+        message: message,
+        // Apenas inclua o stack trace em ambiente de desenvolvimento
+        stack: process.env.NODE_ENV === 'production' ? null : err.stack,
+    });
+};

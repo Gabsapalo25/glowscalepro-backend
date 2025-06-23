@@ -2,39 +2,16 @@
 
 import ActiveCampaignService from '../services/activeCampaignService.js';
 import EmailService from '../services/emailService.js';
-import { quizzesConfig } from '../config/quizzesConfig.js'; // CORRIGIDO: Importa o array quizzesConfig diretamente (sem '}}' extra)
-import pino from 'pino';
-
-// Configuração do logger
-const logger = pino({
-    level: process.env.NODE_ENV === 'production' ? 'info' : 'debug',
-    // GARANTIDO: Apenas adicione transport se NÃO for ambiente de produção
-    ...(process.env.NODE_ENV !== 'production' && {
-        transport: {
-            target: 'pino-pretty',
-            options: {
-                colorize: true,
-                ignore: 'pid,hostname',
-            },
-        },
-    }),
-});
+import { quizzesConfig } from '../config/quizzesConfig.js';
+import logger from '../utils/logger.js'; // Importa o logger centralizado
 
 // Inicializa o serviço ActiveCampaign apenas se as variáveis de ambiente estiverem configuradas
 const activeCampaignService = process.env.ACTIVE_CAMPAIGN_API_URL && process.env.ACTIVE_CAMPAIGN_API_KEY
     ? new ActiveCampaignService(process.env.ACTIVE_CAMPAIGN_API_URL, process.env.ACTIVE_CAMPAIGN_API_KEY)
     : null;
 
-// Inicializa o serviço de e-mail (usando as variáveis para configurar o Nodemailer)
-const emailService = new EmailService({
-    host: process.env.EMAIL_HOST,
-    port: process.env.EMAIL_PORT,
-    secure: process.env.EMAIL_SECURE === 'true', // Converte a string para boolean
-    auth: {
-        user: process.env.EMAIL_USER,
-        pass: process.env.EMAIL_PASS,
-    },
-});
+// Inicializa o serviço de e-mail (usando as variáveis de ambiente corretas do .env)
+const emailService = new EmailService(); // Não passa mais config aqui, o EmailService lê do env diretamente
 
 // Função auxiliar para encontrar a configuração de um quiz pelo ID
 const getQuizConfigById = (quizId) => {
@@ -63,25 +40,27 @@ export const getCsrfToken = (req, res) => {
  * @access Public (com proteção CSRF e validação de payload)
  */
 export const sendResult = async (req, res, next) => {
+    // Adiciona o requestId ao contexto do log para esta requisição, se disponível no req.log
+    const requestLogger = req.log || logger;
+
     const { name, email, score, total, quizId, countryCode, whatsapp, q4, consent } = req.body;
 
-    logger.info(`📝 Recebida solicitação POST para /api/submit-quiz para quizId: ${quizId}`);
-    logger.debug({ name, email, score, total, quizId, countryCode, whatsapp, q4, consent }, 'Dados do quiz recebidos.');
+    requestLogger.info(`📝 Recebida solicitação POST para /api/submit-quiz para quizId: ${quizId}`);
+    requestLogger.debug({ name, email, score, total, quizId, countryCode, whatsapp, q4, consent }, 'Dados do quiz recebidos.');
 
-    // Usando a função auxiliar para obter a configuração do quiz
     const quizConfig = getQuizConfigById(quizId);
 
     if (!quizConfig) {
-        logger.warn(`⚠️ Quiz ID "${quizId}" not found in configuration.`);
+        requestLogger.warn(`⚠️ Quiz ID "${quizId}" not found in configuration.`);
         return res.status(400).json({ error: 'Invalid quiz ID.' });
     }
 
     const { affiliateLink, ctaColor, ctaText, subject, leadTag, activeCampaignFields, emailTemplateFunction } = quizConfig;
     const listId = process.env.AC_LIST_ID_MASTERTOOLS_ALL;
-    const unsubscribeTagId = process.env.UNSUBSCRIBE_TAG_ID; // Usado para e-mails transacionais, se necessário
+    const unsubscribeTagId = process.env.AC_UNSUBSCRIBE_TAG_ID; // Usado para e-mails transacionais, se necessário
 
     if (!listId) {
-        logger.error('❌ AC_LIST_ID_MASTERTOOLS_ALL is not defined in environment variables.');
+        requestLogger.error('❌ AC_LIST_ID_MASTERTOOLS_ALL is not defined in environment variables.');
         return res.status(500).json({ error: 'ActiveCampaign list ID not configured.' });
     }
 
@@ -92,38 +71,34 @@ export const sendResult = async (req, res, next) => {
     ];
 
     if (whatsapp) {
-        // Concatena countryCode e whatsapp se ambos existirem, senão apenas whatsapp
         const fullWhatsapp = countryCode && whatsapp ? `${countryCode}${whatsapp}` : whatsapp;
         customFields.push({ fieldId: activeCampaignFields.whatsappFieldId, value: fullWhatsapp });
-    } else {
-        // Se whatsapp não foi fornecido, garanta que o campo seja limpo ou ignorado
-        // Dependendo da lógica do AC, pode ser necessário enviar um valor vazio ou não enviar o campo.
     }
 
     let contactId;
     try {
-        if (activeCampaignService) {
-            logger.info(`✨ Processando contato no ActiveCampaign para ${email}...`);
+        if (activeCampaignService && activeCampaignService.isEnabled) { // Verifica se o serviço AC está habilitado
+            requestLogger.info(`✨ Processando contato no ActiveCampaign para ${email}...`);
             contactId = await activeCampaignService.createOrUpdateContactAndFields(
                 email,
                 listId,
                 customFields,
                 name,
-                '' // Sem sobrenome por enquanto
+                ''
             );
-            logger.info(`✅ Contato ${contactId} processado no ActiveCampaign.`);
+            requestLogger.info(`✅ Contato ${contactId} processado no ActiveCampaign.`);
 
             if (leadTag) {
-                logger.info(`🏷️ Adicionando tag ${leadTag} ao contato ${contactId}.`);
+                requestLogger.info(`🏷️ Adicionando tag ${leadTag} ao contato ${contactId}.`);
                 await activeCampaignService.addTagToContact(contactId, leadTag);
-                logger.info(`✅ Tag ${leadTag} adicionada ao contato ${contactId}.`);
+                requestLogger.info(`✅ Tag ${leadTag} adicionada ao contato ${contactId}.`);
             }
         } else {
-            logger.warn('❌ ActiveCampaign service not initialized. Skipping AC operations.');
+            requestLogger.warn('❌ ActiveCampaign service not initialized or enabled. Skipping AC operations.');
         }
 
         // Enviar E-mail de Resultado
-        logger.info(`📧 Preparando para enviar e-mail de resultado para ${email}...`);
+        requestLogger.info(`📧 Preparando para enviar e-mail de resultado para ${email}...`);
         const emailContent = emailTemplateFunction({
             userName: name,
             quizScore: score,
@@ -131,17 +106,17 @@ export const sendResult = async (req, res, next) => {
             affiliateLink,
             ctaColor,
             ctaText,
-            unsubscribeTagId: unsubscribeTagId, // Passa a tag de unsubscribe
-            adminEmail: process.env.ADMIN_EMAIL // Passa o e-mail do admin, se necessário no template
+            unsubscribeTagId: unsubscribeTagId,
+            adminEmail: process.env.ADMIN_EMAIL
         });
 
-        await emailService.sendEmail(
-            process.env.ADMIN_EMAIL, // Remetente
-            email,                   // Destinatário
-            subject,                 // Assunto do e-mail
-            emailContent             // Conteúdo HTML do e-mail
-        );
-        logger.info(`✅ E-mail de resultado enviado com sucesso para ${email}.`);
+        await emailService.sendEmail({
+            from: process.env.SMTP_USER, // Remetente (usando a var de env correta)
+            to: email,                   // Destinatário
+            subject: subject,            // Assunto do e-mail
+            html: emailContent           // Conteúdo HTML do e-mail
+        });
+        requestLogger.info(`✅ E-mail de resultado enviado com sucesso para ${email}.`);
 
         res.status(200).json({
             message: 'Quiz submitted successfully. Results sent to your email!',
@@ -149,8 +124,7 @@ export const sendResult = async (req, res, next) => {
         });
 
     } catch (error) {
-        logger.error({ error: error.message, stack: error.stack, email }, '❌ Erro ao processar submissão do quiz.');
-        // Passa o erro para o middleware de tratamento de erros global
+        requestLogger.error({ error_message: error.message, stack: error.stack, email }, '❌ Erro ao processar submissão do quiz.');
         next(error);
     }
 };
