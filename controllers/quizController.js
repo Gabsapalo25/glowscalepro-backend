@@ -2,19 +2,22 @@
 
 import ActiveCampaignService from '../services/activeCampaignService.js';
 import EmailService from '../services/emailService.js';
-import { quizzesConfig } from '../config/quizzesConfig.js'; // ALTERADO: Importa o array quizzesConfig diretamente
+import { quizzesConfig } } from '../config/quizzesConfig.js'; // ALTERADO: Importa o array quizzesConfig diretamente
 import pino from 'pino';
 
 // Configuração do logger
 const logger = pino({
     level: process.env.NODE_ENV === 'production' ? 'info' : 'debug',
-    transport: {
-        target: 'pino-pretty',
-        options: {
-            colorize: true,
-            ignore: 'pid,hostname',
+    // NOVO: Apenas adicione transport se NÃO for ambiente de produção
+    ...(process.env.NODE_ENV !== 'production' && {
+        transport: {
+            target: 'pino-pretty',
+            options: {
+                colorize: true,
+                ignore: 'pid,hostname',
+            },
         },
-    },
+    }),
 });
 
 // Inicializa o serviço ActiveCampaign apenas se as variáveis de ambiente estiverem configuradas
@@ -62,7 +65,7 @@ export const getCsrfToken = (req, res) => {
 export const sendResult = async (req, res, next) => {
     const { name, email, score, total, quizId, countryCode, whatsapp, q4, consent } = req.body;
 
-    logger.info(`🔍 Recebida solicitação POST para /api/submit-quiz para quizId: ${quizId}`);
+    logger.info(`📝 Recebida solicitação POST para /api/submit-quiz para quizId: ${quizId}`);
     logger.debug({ name, email, score, total, quizId, countryCode, whatsapp, q4, consent }, 'Dados do quiz recebidos.');
 
     // ALTERADO: Usando a nova função auxiliar para obter a configuração do quiz
@@ -101,7 +104,7 @@ export const sendResult = async (req, res, next) => {
     let contactId;
     try {
         if (activeCampaignService) {
-            logger.info(`✉️ Processando contato no ActiveCampaign para ${email}...`);
+            logger.info(`✨ Processando contato no ActiveCampaign para ${email}...`);
             contactId = await activeCampaignService.createOrUpdateContactAndFields(
                 email,
                 listId,
