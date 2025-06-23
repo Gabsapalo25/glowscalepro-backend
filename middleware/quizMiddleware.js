@@ -2,50 +2,57 @@
 
 import Joi from 'joi';
 import csurf from 'csurf';
-import cookieParser from 'cookie-parser';
 import logger from '../utils/logger.js';
 
-// ───────────────────────── CSRF Middleware ─────────────────────────
+/** Proteção CSRF com cookie seguro */
 export const csrfProtection = csurf({
   cookie: {
     key: '_csrf',
     httpOnly: true,
     secure: process.env.NODE_ENV === 'production',
-    maxAge: 3600
+    maxAge: 3600 // 1 hora
   }
 });
 
+/** Middleware para geração de token CSRF */
 export const generateCsrfToken = (req, res, next) => {
-  res.cookie('_csrf', req.csrfToken());
-  req.csrfTokenGenerated = true;
-  next();
-};
-
-// ─────────────────────── Dev Auth Middleware ───────────────────────
-export const devAuthMiddleware = (req, res, next) => {
-  if (process.env.NODE_ENV !== 'development') return next();
-  const devKey = process.env.DEV_API_KEY;
-  const clientKey = req.headers['x-dev-key'];
-
-  if (!clientKey || clientKey !== devKey) {
-    return res.status(401).json({ message: 'Unauthorized - Invalid Dev Key' });
+  try {
+    const token = req.csrfToken();
+    req.csrfTokenValue = token; // Armazena para o controller retornar
+    next();
+  } catch (err) {
+    const requestLogger = req.log || logger;
+    requestLogger.error({ err }, '❌ Falha ao gerar token CSRF');
+    res.status(500).json({ message: 'Erro ao gerar token CSRF.' });
   }
+};
 
+/** Middleware para autenticação em ambiente de desenvolvimento */
+export const devAuthMiddleware = (req, res, next) => {
+  const devKey = process.env.DEV_API_KEY;
+  if (process.env.NODE_ENV === 'development' && devKey) {
+    const authHeader = req.headers['authorization'];
+    if (!authHeader || authHeader !== `Bearer ${devKey}`) {
+      logger.warn('🔒 Acesso negado - chave de desenvolvimento ausente ou inválida');
+      return res.status(401).json({ message: 'Acesso não autorizado' });
+    }
+  }
   next();
 };
 
-// ─────────────────────── Logger Middleware ─────────────────────────
+/** Middleware para logar as requisições */
 export const logRequest = (req, res, next) => {
   const requestLogger = req.log || logger;
   requestLogger.info({
     method: req.method,
-    path: req.originalUrl,
-    body: req.body
-  }, '📥 Incoming request');
+    url: req.originalUrl,
+    body: req.body,
+    query: req.query
+  }, '📥 Nova requisição recebida');
   next();
 };
 
-// ─────────────────────── Joi Quiz Validation ───────────────────────
+/** Esquema de validação para submissão de quiz */
 const quizSubmissionSchema = Joi.object({
   name: Joi.string().trim().min(2).max(100).required().messages({
     'string.base': 'Nome deve ser texto.',
@@ -95,17 +102,17 @@ const quizSubmissionSchema = Joi.object({
   })
 });
 
+/** Middleware de validação com Joi */
 export const validateQuizSubmission = (req, res, next) => {
   const requestLogger = req.log || logger;
-
   const { error } = quizSubmissionSchema.validate(req.body, { abortEarly: false });
 
   if (error) {
     const errors = error.details.map(err => err.message);
-    requestLogger.error({ validationErrors: errors, body: req.body }, '🚫 Quiz Submission Validation Failed');
+    requestLogger.error({ validationErrors: errors, body: req.body }, '🚫 Falha na validação do quiz');
     return res.status(400).json({ errors });
   }
 
-  requestLogger.info('✅ Quiz submission data validated successfully.');
+  requestLogger.info('✅ Dados do quiz validados com sucesso.');
   next();
 };
