@@ -1,55 +1,34 @@
-// middleware/quizMiddleware.js
+// middleware/quizMiddleware.js (CONTEÚDO FINAL E DEFINITIVO)
 
 import crypto from 'crypto';
-import sanitizeHtml from 'sanitize-html';
 import pino from 'pino';
-import cors from 'cors'; // Importar cors
-import rateLimit from 'express-rate-limit'; // Importar express-rate-limit
+import rateLimit from 'express-rate-limit';
+import cors from 'cors';
 
 const logger = pino();
 const csrfTokens = new Set();
 
-/**
- * Middleware para geração de token CSRF.
- * Gera um token único e o armazena em memória por 1 hora.
- * @param {import('express').Request} req - O objeto de requisição.
- * @param {import('express').Response} res - O objeto de resposta.
- * @param {import('express').NextFunction} next - A função next do Express.
- */
 export function generateCsrfToken(req, res, next) {
   const token = crypto.randomUUID();
   csrfTokens.add(token);
-
   setTimeout(() => {
     if (csrfTokens.has(token)) {
       csrfTokens.delete(token);
       logger.info(`🗑️ Token removido por expiração: ${token}`);
     }
-  }, 3600 * 1000); // 1 hora de expiração
-
-  // Não envie a resposta JSON aqui se este middleware for parte de uma cadeia
-  // Em vez disso, adicione o token à requisição para ser usado posteriormente
-  req.csrfToken = token; // Adiciona o token à requisição
-  next(); // Continua para o próximo middleware/rota
+  }, 3600 * 1000); // 1 hora
+  req.csrfToken = token;
+  res.json({ csrfToken: token });
 }
 
-/**
- * Middleware de proteção CSRF.
- * Verifica se o token CSRF fornecido na requisição é válido.
- * @param {import('express').Request} req - O objeto de requisição.
- * @param {import('express').Response} res - O objeto de resposta.
- * @param {import('express').NextFunction} next - A função next do Express.
- */
 export function csrfProtection(req, res, next) {
   const csrfToken = req.body.csrfToken || req.headers['x-csrf-token'];
-
   if (!csrfToken) {
     logger.warn('🚫 Missing CSRF token in request headers or body');
     return res.status(403).json({ error: 'Missing CSRF token' });
   }
-
   if (csrfTokens.has(csrfToken)) {
-    csrfTokens.delete(csrfToken); // Remove o token após o uso (single-use token)
+    csrfTokens.delete(csrfToken); // Token válido é usado e removido para evitar reuso
     logger.info(`🔓 Token válido usado: ${csrfToken}`);
     return next();
   } else {
@@ -58,15 +37,9 @@ export function csrfProtection(req, res, next) {
   }
 }
 
-// NOTE: A função validateQuizPayload duplicada foi removida daqui.
-// Utilize o validateQuizPayload do arquivo 'middleware/validateQuizPayload.js'
-// que usa express-validator para validações mais robustas.
+// **IMPORTANTE: A função 'validateQuizPayload' FOI REMOVIDA DESTE ARQUIVO!**
+// Ela deve existir APENAS no arquivo 'middleware/validateQuizPayload.js'.
 
-/**
- * Configura o middleware CORS para a aplicação.
- * @param {import('express').Application} app - A instância do aplicativo Express.
- * @param {object} env - Objeto contendo variáveis de ambiente (especialmente FRONTEND_URL).
- */
 export function configureCors(app, env) {
   app.use(cors({
     origin: env.FRONTEND_URL,
@@ -75,29 +48,17 @@ export function configureCors(app, env) {
   }));
 }
 
-/**
- * Configura o middleware de rate-limiting para a aplicação.
- * Aplica um limite de requisições a uma rota específica.
- * @param {import('express').Application} app - A instância do aplicativo Express.
- */
 export function configureRateLimit(app) {
   const apiLimiter = rateLimit({
     windowMs: 15 * 60 * 1000, // 15 minutos
-    max: 100, // Limite de 100 requisições por IP por janela
+    max: 100, // Limite de 100 requisições por IP em 15 minutos
     message: { error: 'Too many requests. Please try again later.' }
   });
-  // NOTE: Ajuste a rota se 'send-result' não for mais o endpoint principal do quiz.
-  // Se o endpoint principal for '/api/submit-quiz', você deve aplicar o rate limit lá.
-  app.use('/api/submit-quiz', apiLimiter); // Exemplo: aplicando ao seu endpoint de submissão de quiz
+  // Aplica o rate limit a rotas específicas ou a um prefixo de rota
+  // Se '/api' é o prefixo global e a rota do quiz é '/submit-quiz', o caminho completo é '/api/submit-quiz'
+  app.use('/api/submit-quiz', apiLimiter);
 }
 
-/**
- * Middleware de autenticação básica para ambiente de desenvolvimento.
- * Verifica a presença de uma chave de API para acesso em dev.
- * @param {import('express').Request} req - O objeto de requisição.
- * @param {import('express').Response} res - O objeto de resposta.
- * @param {import('express').NextFunction} next - A função next do Express.
- */
 export function devAuthMiddleware(req, res, next) {
   if (process.env.NODE_ENV === 'development' && process.env.DEV_API_KEY) {
     const apiKey = req.headers['x-api-key'];
@@ -109,17 +70,11 @@ export function devAuthMiddleware(req, res, next) {
   next();
 }
 
-/**
- * Middleware de log estruturado para requisições recebidas.
- * @param {import('express').Request} req - O objeto de requisição.
- * @param {import('express').Response} res - O objeto de resposta.
- * @param {import('express').NextFunction} next - A função next do Express.
- */
 export function logRequest(req, res, next) {
   logger.info(`📥 ${req.method} ${req.url}`, {
     ip: req.ip,
     userAgent: req.get('User-Agent'),
-    body: req.body // Cuidado com dados sensíveis em logs de produção
+    body: req.body
   });
   next();
 }
