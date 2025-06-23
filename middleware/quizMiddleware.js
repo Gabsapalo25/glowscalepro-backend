@@ -2,102 +2,107 @@ import Joi from 'joi';
 import csurf from 'csurf';
 import logger from '../utils/logger.js';
 
-// Middleware de proteção CSRF (baseado em cookie)
+// CSRF protection middleware (uses cookies)
 export const csrfProtection = csurf({
   cookie: {
     key: '_csrf',
     httpOnly: true,
     secure: process.env.NODE_ENV === 'production',
-    maxAge: 3600 // 1 hora
-  }
+    maxAge: 3600, // 1 hour
+  },
 });
 
-// Middleware para gerar e expor o token CSRF antes de enviar ao frontend
-export const generateCsrfToken = (req, res, next) => {
-  try {
-    const token = req.csrfToken();
-    req.csrfTokenGenerated = token;
-    next();
-  } catch (err) {
-    next(err);
-  }
+// Sends CSRF token in JSON response
+export const generateCsrfToken = (req, res) => {
+  const token = req.csrfToken();
+  logger.info('✅ CSRF token generated and sent.');
+  res.status(200).json({ csrfToken: token });
 };
 
-// Middleware para autenticação básica no ambiente de desenvolvimento
+// Request logger middleware
+export const logRequest = (req, res, next) => {
+  const requestLogger = req.log || logger;
+  requestLogger.info({
+    url: req.originalUrl,
+    method: req.method,
+    ip: req.ip,
+    body: req.body,
+  }, '📨 Incoming request');
+  next();
+};
+
+// Dev-only authentication middleware
 export const devAuthMiddleware = (req, res, next) => {
-  if (process.env.NODE_ENV === 'development') {
-    const authHeader = req.headers.authorization || '';
-    const token = authHeader.replace('Bearer ', '').trim();
-    if (token !== process.env.DEV_AUTH_TOKEN) {
-      const requestLogger = req.log || logger;
-      requestLogger.warn({ ip: req.ip }, '🔒 Acesso negado: token de desenvolvimento inválido.');
-      return res.status(401).json({ error: 'Acesso não autorizado (dev).' });
+  if (process.env.NODE_ENV !== 'production') {
+    const auth = req.headers.authorization;
+    if (!auth || auth !== `Bearer ${process.env.DEV_AUTH_TOKEN}`) {
+      return res.status(401).json({ message: 'Unauthorized (dev mode)' });
     }
   }
   next();
 };
 
-// Middleware para logar todas as requisições (com requestId, se houver)
-export const logRequest = (req, res, next) => {
-  const requestLogger = req.log || logger;
-  requestLogger.info({
-    method: req.method,
-    url: req.originalUrl,
-    ip: req.ip,
-    body: req.body
-  }, '📨 Requisição recebida');
-  next();
-};
-
-// Esquema Joi para validar submissão de quiz
+// Joi schema for validating quiz submission
 const quizSubmissionSchema = Joi.object({
   name: Joi.string().trim().min(2).max(100).required().messages({
-    'string.empty': 'Nome não pode ser vazio.',
-    'string.min': 'Nome deve ter no mínimo {#limit} caracteres.',
-    'string.max': 'Nome deve ter no máximo {#limit} caracteres.',
-    'any.required': 'Nome é obrigatório.'
+    'string.base': 'Name must be a string.',
+    'string.empty': 'Name is required.',
+    'string.min': 'Name must be at least {#limit} characters.',
+    'string.max': 'Name must be at most {#limit} characters.',
+    'any.required': 'Name is required.',
   }),
   email: Joi.string().email().required().messages({
-    'string.email': 'Email inválido.',
-    'any.required': 'Email é obrigatório.'
+    'string.email': 'Invalid email format.',
+    'string.empty': 'Email is required.',
+    'any.required': 'Email is required.',
   }),
   score: Joi.number().integer().min(0).required().messages({
-    'number.base': 'Pontuação deve ser um número.',
-    'any.required': 'Pontuação é obrigatória.'
+    'number.base': 'Score must be a number.',
+    'number.integer': 'Score must be an integer.',
+    'number.min': 'Score cannot be negative.',
+    'any.required': 'Score is required.',
   }),
   total: Joi.number().integer().min(1).required().messages({
-    'any.required': 'Total de perguntas é obrigatório.'
+    'number.base': 'Total must be a number.',
+    'number.integer': 'Total must be an integer.',
+    'number.min': 'Total must be at least {#limit}.',
+    'any.required': 'Total is required.',
   }),
   quizId: Joi.string().alphanum().min(3).max(50).required().messages({
-    'string.alphanum': 'ID do quiz deve conter apenas letras e números.',
-    'any.required': 'ID do quiz é obrigatório.'
+    'string.base': 'Quiz ID must be a string.',
+    'string.empty': 'Quiz ID is required.',
+    'string.alphanum': 'Quiz ID must contain only letters and numbers.',
+    'any.required': 'Quiz ID is required.',
   }),
   countryCode: Joi.string().pattern(/^\+\d{1,3}$/).optional().allow('').messages({
-    'string.pattern.base': 'Código do país inválido (ex: +244).'
+    'string.pattern.base': 'Invalid country code format (e.g., +1).',
   }),
   whatsapp: Joi.string().pattern(/^\d{8,15}$/).optional().allow('').messages({
-    'string.pattern.base': 'Número de WhatsApp inválido.'
+    'string.pattern.base': 'Invalid WhatsApp number (digits only, 8 to 15 characters).',
   }),
   q4: Joi.string().min(1).max(500).required().messages({
-    'any.required': 'Resposta da Q4 é obrigatória.'
+    'string.base': 'Answer to Q4 must be text.',
+    'string.empty': 'Q4 answer is required.',
+    'any.required': 'Q4 answer is required.',
   }),
-  consent: Joi.boolean().required().valid(true).messages({
-    'any.only': 'Você deve consentir para continuar.'
-  })
+  consent: Joi.boolean().valid(true).required().messages({
+    'boolean.base': 'Consent must be a boolean.',
+    'any.required': 'Consent is required.',
+    'any.only': 'You must give consent to proceed.',
+  }),
 });
 
-// Middleware de validação usando Joi
+// Middleware to validate quiz submission payload
 export const validateQuizSubmission = (req, res, next) => {
   const requestLogger = req.log || logger;
-
   const { error } = quizSubmissionSchema.validate(req.body, { abortEarly: false });
 
   if (error) {
-    const errors = error.details.map(detail => detail.message);
-    requestLogger.error({ errors, body: req.body }, '❌ Falha na validação do quiz');
+    const errors = error.details.map(err => err.message);
+    requestLogger.error({ validationErrors: errors, body: req.body }, '🚫 Quiz validation failed');
     return res.status(400).json({ errors });
   }
 
-  requestLogger.info('✅ Submissão do quiz validada com sucesso.');
+  requestLogger.info('✅ Quiz submission validated successfully.');
   next();
 };
