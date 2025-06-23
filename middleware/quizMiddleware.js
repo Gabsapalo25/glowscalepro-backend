@@ -3,11 +3,19 @@
 import crypto from 'crypto';
 import sanitizeHtml from 'sanitize-html';
 import pino from 'pino';
+import cors from 'cors'; // Importar cors
+import rateLimit from 'express-rate-limit'; // Importar express-rate-limit
 
 const logger = pino();
 const csrfTokens = new Set();
 
-// Middleware para geração de token CSRF
+/**
+ * Middleware para geração de token CSRF.
+ * Gera um token único e o armazena em memória por 1 hora.
+ * @param {import('express').Request} req - O objeto de requisição.
+ * @param {import('express').Response} res - O objeto de resposta.
+ * @param {import('express').NextFunction} next - A função next do Express.
+ */
 export function generateCsrfToken(req, res, next) {
   const token = crypto.randomUUID();
   csrfTokens.add(token);
@@ -17,13 +25,21 @@ export function generateCsrfToken(req, res, next) {
       csrfTokens.delete(token);
       logger.info(`🗑️ Token removido por expiração: ${token}`);
     }
-  }, 3600 * 1000); // 1 hora
+  }, 3600 * 1000); // 1 hora de expiração
 
-  req.csrfToken = token;
-  res.json({ csrfToken: token });
+  // Não envie a resposta JSON aqui se este middleware for parte de uma cadeia
+  // Em vez disso, adicione o token à requisição para ser usado posteriormente
+  req.csrfToken = token; // Adiciona o token à requisição
+  next(); // Continua para o próximo middleware/rota
 }
 
-// Middleware de proteção CSRF
+/**
+ * Middleware de proteção CSRF.
+ * Verifica se o token CSRF fornecido na requisição é válido.
+ * @param {import('express').Request} req - O objeto de requisição.
+ * @param {import('express').Response} res - O objeto de resposta.
+ * @param {import('express').NextFunction} next - A função next do Express.
+ */
 export function csrfProtection(req, res, next) {
   const csrfToken = req.body.csrfToken || req.headers['x-csrf-token'];
 
@@ -33,7 +49,7 @@ export function csrfProtection(req, res, next) {
   }
 
   if (csrfTokens.has(csrfToken)) {
-    csrfTokens.delete(csrfToken);
+    csrfTokens.delete(csrfToken); // Remove o token após o uso (single-use token)
     logger.info(`🔓 Token válido usado: ${csrfToken}`);
     return next();
   } else {
@@ -42,52 +58,15 @@ export function csrfProtection(req, res, next) {
   }
 }
 
-// Middleware de validação de payload do quiz
-export function validateQuizPayload(req, res, next) {
-  const { name, email, score, total, quizTitle, countryCode, whatsapp, q4, consent } = req.body;
+// NOTE: A função validateQuizPayload duplicada foi removida daqui.
+// Utilize o validateQuizPayload do arquivo 'middleware/validateQuizPayload.js'
+// que usa express-validator para validações mais robustas.
 
-  // Sanitização de campos
-  req.body.sanitizedName = sanitizeHtml(name);
-  req.body.sanitizedEmail = sanitizeHtml(email);
-  req.body.sanitizedQ4 = sanitizeHtml(q4);
-
-  // Validações
-  if (!name || name.length < 2) {
-    return res.status(400).json({ error: 'Invalid name. Must be at least 2 characters.' });
-  }
-
-  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-    return res.status(400).json({ error: 'Invalid email address.' });
-  }
-
-  if (typeof score !== 'number' || typeof total !== 'number') {
-    return res.status(400).json({ error: 'Score and total must be numbers.' });
-  }
-
-  if (!quizTitle) {
-    return res.status(400).json({ error: 'Quiz title is required.' });
-  }
-
-  if (!q4) {
-    return res.status(400).json({ error: 'Please select an option for interest level.' });
-  }
-
-  if (typeof consent !== 'boolean') {
-    return res.status(400).json({ error: 'Consent must be a boolean.' });
-  }
-
-  if (whatsapp && !/^\d{8,15}$/.test(whatsapp)) {
-    return res.status(400).json({ error: 'Invalid WhatsApp number.' });
-  }
-
-  if (countryCode && !/^\+\d{1,3}$/.test(countryCode)) {
-    return res.status(400).json({ error: 'Invalid country code.' });
-  }
-
-  next();
-}
-
-// Middleware de CORS com credenciais
+/**
+ * Configura o middleware CORS para a aplicação.
+ * @param {import('express').Application} app - A instância do aplicativo Express.
+ * @param {object} env - Objeto contendo variáveis de ambiente (especialmente FRONTEND_URL).
+ */
 export function configureCors(app, env) {
   app.use(cors({
     origin: env.FRONTEND_URL,
@@ -96,17 +75,29 @@ export function configureCors(app, env) {
   }));
 }
 
-// Middleware de rate-limiting
+/**
+ * Configura o middleware de rate-limiting para a aplicação.
+ * Aplica um limite de requisições a uma rota específica.
+ * @param {import('express').Application} app - A instância do aplicativo Express.
+ */
 export function configureRateLimit(app) {
   const apiLimiter = rateLimit({
-    windowMs: 15 * 60 * 1000,
-    max: 100,
+    windowMs: 15 * 60 * 1000, // 15 minutos
+    max: 100, // Limite de 100 requisições por IP por janela
     message: { error: 'Too many requests. Please try again later.' }
   });
-  app.use('/send-result', apiLimiter);
+  // NOTE: Ajuste a rota se 'send-result' não for mais o endpoint principal do quiz.
+  // Se o endpoint principal for '/api/submit-quiz', você deve aplicar o rate limit lá.
+  app.use('/api/submit-quiz', apiLimiter); // Exemplo: aplicando ao seu endpoint de submissão de quiz
 }
 
-// Middleware de autenticação básica (dev)
+/**
+ * Middleware de autenticação básica para ambiente de desenvolvimento.
+ * Verifica a presença de uma chave de API para acesso em dev.
+ * @param {import('express').Request} req - O objeto de requisição.
+ * @param {import('express').Response} res - O objeto de resposta.
+ * @param {import('express').NextFunction} next - A função next do Express.
+ */
 export function devAuthMiddleware(req, res, next) {
   if (process.env.NODE_ENV === 'development' && process.env.DEV_API_KEY) {
     const apiKey = req.headers['x-api-key'];
@@ -118,12 +109,17 @@ export function devAuthMiddleware(req, res, next) {
   next();
 }
 
-// Middleware de log estruturado
+/**
+ * Middleware de log estruturado para requisições recebidas.
+ * @param {import('express').Request} req - O objeto de requisição.
+ * @param {import('express').Response} res - O objeto de resposta.
+ * @param {import('express').NextFunction} next - A função next do Express.
+ */
 export function logRequest(req, res, next) {
   logger.info(`📥 ${req.method} ${req.url}`, {
     ip: req.ip,
     userAgent: req.get('User-Agent'),
-    body: req.body
+    body: req.body // Cuidado com dados sensíveis em logs de produção
   });
   next();
 }
