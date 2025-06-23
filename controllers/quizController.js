@@ -2,7 +2,7 @@
 
 import ActiveCampaignService from '../services/activeCampaignService.js';
 import EmailService from '../services/emailService.js';
-import { getQuizConfig } from '../config/quizzesConfig.js';
+import { quizzesConfig } from '../config/quizzesConfig.js'; // ALTERADO: Importa o array quizzesConfig diretamente
 import pino from 'pino';
 
 // Configuração do logger
@@ -33,6 +33,11 @@ const emailService = new EmailService({
     },
 });
 
+// NOVO: Função auxiliar para encontrar a configuração de um quiz pelo ID
+const getQuizConfigById = (quizId) => {
+    return quizzesConfig.find(quiz => quiz.quizId === quizId);
+};
+
 /**
  * @route GET /api/csrf-token
  * @description Retorna um token CSRF para proteger contra ataques CSRF.
@@ -57,13 +62,14 @@ export const getCsrfToken = (req, res) => {
 export const sendResult = async (req, res, next) => {
     const { name, email, score, total, quizId, countryCode, whatsapp, q4, consent } = req.body;
 
-    logger.info(`✨ Recebida solicitação POST para /api/submit-quiz para quizId: ${quizId}`);
+    logger.info(`🔍 Recebida solicitação POST para /api/submit-quiz para quizId: ${quizId}`);
     logger.debug({ name, email, score, total, quizId, countryCode, whatsapp, q4, consent }, 'Dados do quiz recebidos.');
 
-    const quizConfig = getQuizConfig(quizId);
+    // ALTERADO: Usando a nova função auxiliar para obter a configuração do quiz
+    const quizConfig = getQuizConfigById(quizId);
 
     if (!quizConfig) {
-        logger.warn(`🚫 Quiz ID "${quizId}" not found in configuration.`);
+        logger.warn(`⚠️ Quiz ID "${quizId}" not found in configuration.`);
         return res.status(400).json({ error: 'Invalid quiz ID.' });
     }
 
@@ -72,14 +78,14 @@ export const sendResult = async (req, res, next) => {
     const unsubscribeTagId = process.env.UNSUBSCRIBE_TAG_ID; // Usado para e-mails transacionais, se necessário
 
     if (!listId) {
-        logger.error('⚠️ AC_LIST_ID_MASTERTOOLS_ALL is not defined in environment variables.');
+        logger.error('❌ AC_LIST_ID_MASTERTOOLS_ALL is not defined in environment variables.');
         return res.status(500).json({ error: 'ActiveCampaign list ID not configured.' });
     }
 
     // Prepare custom fields for ActiveCampaign
     const customFields = [
         { fieldId: activeCampaignFields.scoreFieldId, value: String(score) }, // Score
-        { fieldId: activeCampaignFields.q4FieldId, value: q4 },                 // Q4 Answer
+        { fieldId: activeCampaignFields.q4FieldId, value: q4 },              // Q4 Answer
     ];
 
     if (whatsapp) {
@@ -111,7 +117,7 @@ export const sendResult = async (req, res, next) => {
                 logger.info(`✅ Tag ${leadTag} adicionada ao contato ${contactId}.`);
             }
         } else {
-            logger.warn('⚠️ ActiveCampaign service not initialized. Skipping AC operations.');
+            logger.warn('❌ ActiveCampaign service not initialized. Skipping AC operations.');
         }
 
         // Enviar E-mail de Resultado
@@ -141,7 +147,7 @@ export const sendResult = async (req, res, next) => {
         });
 
     } catch (error) {
-        logger.error({ error: error.message, stack: error.stack, email }, '💥 Erro ao processar submissão do quiz.');
+        logger.error({ error: error.message, stack: error.stack, email }, '❌ Erro ao processar submissão do quiz.');
         // Passa o erro para o middleware de tratamento de erros global
         next(error);
     }
