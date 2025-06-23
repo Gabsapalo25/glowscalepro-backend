@@ -5,62 +5,77 @@ import { cleanEnv, str, port, bool } from 'envalid';
 
 // Validação das variáveis de ambiente
 const env = cleanEnv(process.env, {
-  SMTP_HOST: str(),
-  SMTP_PORT: port(),
-  SMTP_SECURE: bool(),
-  SMTP_USER: str(),
-  SMTP_PASS: str(),
-  SMTP_TLS_REJECT_UNAUTHORIZED: bool()
+  EMAIL_HOST: str(), // Mudado de SMTP_HOST para EMAIL_HOST para consistência com quizController.js
+  EMAIL_PORT: port(), // Mudado de SMTP_PORT para EMAIL_PORT
+  EMAIL_SECURE: bool(), // Mudado de SMTP_SECURE para EMAIL_SECURE
+  EMAIL_USER: str(), // Mudado de SMTP_USER para EMAIL_USER
+  EMAIL_PASS: str(), // Mudado de SMTP_PASS para EMAIL_PASS
+  // SMTP_TLS_REJECT_UNAUTHORIZED: bool() // Removido, pois não é usado explicitamente na classe
 });
 
-// Configuração do logger
-const logger = pino({ level: process.env.LOG_LEVEL || 'info' });
-
-// Configuração do transporter
-const transporter = nodemailer.createTransport({
-  host: env.SMTP_HOST,
-  port: env.SMTP_PORT,
-  secure: env.SMTP_SECURE,
-  auth: {
-    user: env.SMTP_USER,
-    pass: env.SMTP_PASS
-  },
-  tls: {
-    rejectUnauthorized: env.SMTP_TLS_REJECT_UNAUTHORIZED
-  }
+// Configuração do logger (com a condição do pino-pretty que aprendemos)
+const logger = pino({
+    level: process.env.NODE_ENV === 'production' ? 'info' : 'debug',
+    // Apenas adicione transport se NÃO for ambiente de produção
+    ...(process.env.NODE_ENV !== 'production' && {
+        transport: {
+            target: 'pino-pretty',
+            options: {
+                colorize: true,
+                ignore: 'pid,hostname',
+            },
+        },
+    }),
 });
 
-// Verificação inicial do transporter
-transporter.verify((error) => {
-  if (error) {
-    logger.error(`❌ SMTP connection error: ${error.message}`);
-  } else {
-    logger.info('✅ SMTP server connected successfully');
-  }
-});
+class EmailService {
+  constructor(smtpConfig) {
+    // Configuração do transporter usando as variáveis de ambiente ou config passada
+    this.transporter = nodemailer.createTransport({
+      host: smtpConfig.host || env.EMAIL_HOST,
+      port: smtpConfig.port || env.EMAIL_PORT,
+      secure: smtpConfig.secure || env.EMAIL_SECURE,
+      auth: {
+        user: smtpConfig.auth.user || env.EMAIL_USER,
+        pass: smtpConfig.auth.pass || env.EMAIL_PASS
+      },
+      // tls: {
+      //   rejectUnauthorized: env.SMTP_TLS_REJECT_UNAUTHORIZED // Use se necessário e definido em env
+      // }
+    });
 
-// Função para enviar e-mail (AGORA COM EXPORTAÇÃO DEFAULT)
-export const sendEmail = async ({ to, subject, html, text }) => { // Mantenha sendEmail como um export nomeado para consistência
-  try {
-    const mailOptions = {
-      from: `"GlowscalePro" <${env.SMTP_USER}>`,
-      to,
-      subject,
-      html,
-      text: text || html.replace(/<[^>]*>/g, ''), // Fallback para text/plain
-      headers: {
-        'List-Unsubscribe': '<https://glowscalepro.com/unsubscribe>',
-        'X-Mailer': 'GlowscaleProMailer/1.0'
+    // Verificação inicial do transporter
+    this.transporter.verify((error) => {
+      if (error) {
+        logger.error(`❌ SMTP connection error: ${error.message}`);
+        // Considerar lançar um erro ou lidar com isso de forma mais robusta no startup
+      } else {
+        logger.info('✅ SMTP server connected successfully');
       }
-    };
-
-    await transporter.sendMail(mailOptions);
-    logger.info(`✅ Email sent successfully to: ${to}`);
-  } catch (error) {
-    logger.error(`❌ Failed to send email to ${to}: ${error.message}`);
-    throw new Error(`Email sending failed: ${error.message}`);
+    });
   }
-};
 
-// Exporta sendEmail como default
-export default sendEmail; // <-- ESTA É A MUDANÇA MAIS IMPORTANTE AQUI
+  async sendEmail({ from, to, subject, html, text }) {
+    try {
+      const mailOptions = {
+        from: from || `"GlowscalePro" <${env.EMAIL_USER}>`, // Permite sobrescrever o remetente
+        to,
+        subject,
+        html,
+        text: text || html.replace(/<[^>]*>/g, ''), // Fallback para text/plain
+        headers: {
+          'List-Unsubscribe': '<https://glowscalepro.com/unsubscribe>', // Exemplo, ajuste para o seu domínio
+          'X-Mailer': 'GlowscaleProMailer/1.0'
+        }
+      };
+
+      await this.transporter.sendMail(mailOptions);
+      logger.info(`✅ Email sent successfully to: ${to}`);
+    } catch (error) {
+      logger.error(`❌ Failed to send email to ${to}: ${error.message}`);
+      throw new Error(`Email sending failed: ${error.message}`);
+    }
+  }
+}
+
+export default EmailService; // Agora exporta a CLASSE EmailService
