@@ -2,13 +2,13 @@
 
 import ActiveCampaignService from '../services/activeCampaignService.js';
 import EmailService from '../services/emailService.js';
-import { quizzesConfig } } from '../config/quizzesConfig.js'; // ALTERADO: Importa o array quizzesConfig diretamente
+import { quizzesConfig } from '../config/quizzesConfig.js'; // CORRIGIDO: Importa o array quizzesConfig diretamente (sem '}}' extra)
 import pino from 'pino';
 
 // Configuração do logger
 const logger = pino({
     level: process.env.NODE_ENV === 'production' ? 'info' : 'debug',
-    // NOVO: Apenas adicione transport se NÃO for ambiente de produção
+    // GARANTIDO: Apenas adicione transport se NÃO for ambiente de produção
     ...(process.env.NODE_ENV !== 'production' && {
         transport: {
             target: 'pino-pretty',
@@ -36,7 +36,7 @@ const emailService = new EmailService({
     },
 });
 
-// NOVO: Função auxiliar para encontrar a configuração de um quiz pelo ID
+// Função auxiliar para encontrar a configuração de um quiz pelo ID
 const getQuizConfigById = (quizId) => {
     return quizzesConfig.find(quiz => quiz.quizId === quizId);
 };
@@ -68,7 +68,7 @@ export const sendResult = async (req, res, next) => {
     logger.info(`📝 Recebida solicitação POST para /api/submit-quiz para quizId: ${quizId}`);
     logger.debug({ name, email, score, total, quizId, countryCode, whatsapp, q4, consent }, 'Dados do quiz recebidos.');
 
-    // ALTERADO: Usando a nova função auxiliar para obter a configuração do quiz
+    // Usando a função auxiliar para obter a configuração do quiz
     const quizConfig = getQuizConfigById(quizId);
 
     if (!quizConfig) {
@@ -98,7 +98,6 @@ export const sendResult = async (req, res, next) => {
     } else {
         // Se whatsapp não foi fornecido, garanta que o campo seja limpo ou ignorado
         // Dependendo da lógica do AC, pode ser necessário enviar um valor vazio ou não enviar o campo.
-        // Por agora, se não for enviado, ele simplesmente não será atualizado para vazio.
     }
 
     let contactId;
