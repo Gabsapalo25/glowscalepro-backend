@@ -1,17 +1,21 @@
 // services/activeCampaignService.js
+
 import axios from 'axios';
 import pino from 'pino';
 
 // Configuração do logger
 const logger = pino({
     level: process.env.NODE_ENV === 'production' ? 'info' : 'debug',
-    transport: {
-        target: 'pino-pretty',
-        options: {
-            colorize: true,
-            ignore: 'pid,hostname',
+    // NOVO: Apenas adicione transport se NÃO for ambiente de produção
+    ...(process.env.NODE_ENV !== 'production' && {
+        transport: {
+            target: 'pino-pretty',
+            options: {
+                colorize: true,
+                ignore: 'pid,hostname',
+            },
         },
-    },
+    }),
 });
 
 class ActiveCampaignService {

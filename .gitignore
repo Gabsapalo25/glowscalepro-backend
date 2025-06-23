@@ -1,40 +1,43 @@
-# Node modules
+# Ignorar a pasta de módulos do Node
 node_modules/
 
-# Environment and credentials
+# Ignorar arquivos de ambiente local
 .env
-.env.*
-!.env.example
+.env.local
 
-# Logs
-logs/*.log
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
+# Ignorar logs do Pino (se você tiver uma pasta de logs ou arquivos .log na raiz)
+logs/
+*.log
 
-# Temporary directories
+# Ignorar arquivos de build ou temporários
+build/
+dist/
 tmp/
 temp/
-.cache/
 
-# System files
+# Ignorar arquivos de cache do npm
+.npm/
+
+# Ignorar arquivos de sistema operacional específicos (Windows, macOS)
 .DS_Store
 Thumbs.db
 
-# Test and coverage reports
-coverage/
-*.lcov
-test-results/
+# Ignorar arquivos de dados ou de configuração gerados automaticamente (como csrf.json se for gerado dinamicamente)
+csrf.json
 
-# Build artifacts
-dist/
-build/
-
-# IDE configurations
-.vscode/
-.idea/
-
-# Render-specific files
-render-build/
-
-"config/Novo Documento de Texto.txt" 
+# Ignorar os arquivos que você viu como "Untracked files" nos seus logs do Git
+# Estes são provavelmente artefatos de logs ou comandos do terminal que não devem ir para o Git
+0.5
+Build
+Common
+cd
+dir
+Exited
+git
+node
+ou
+Running
+Transferred
+Uploaded
+Uploading
+{
