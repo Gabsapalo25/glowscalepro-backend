@@ -1,12 +1,19 @@
+// routes/quizRoutes.js
+
 import express from 'express';
 
-// Importa os middlewares
-import { generateCsrfToken } from '../middleware/csrfMiddleware.js'; // Supondo que isso está separado
-import { validateQuizPayload } from '../middleware/validateQuizPayload.js';
-import { devAuthMiddleware, logRequest } from '../middleware/devMiddleware.js'; // Supondo middleware separado
-import csrfProtection from '../middleware/csrfProtection.js'; // Se o CSRF estiver isolado
+// Importa os middlewares de validação e segurança do quiz
+import {
+  generateCsrfToken,
+  csrfProtection,
+  devAuthMiddleware,
+  logRequest
+} from '../middleware/quizMiddleware.js';
 
-// Controladores
+// Importa o middleware de validação com express-validator
+import { validateQuizPayload } from '../middleware/validateQuizPayload.js';
+
+// Importa os controladores
 import {
   sendResult,
   getCsrfToken as getCsrfTokenController
@@ -14,25 +21,25 @@ import {
 
 const router = express.Router();
 
-// Aplica middleware de log para todas as requisições neste router
+// Middleware de log (aplicado em todas as rotas)
 router.use(logRequest);
 
-// Aplica autenticação somente no ambiente de desenvolvimento
+// Middleware de autenticação para desenvolvimento (se ativado)
 router.use(devAuthMiddleware);
 
-// Endpoint para obtenção de token CSRF
+// Rota para obter o token CSRF
 router.get(
   '/csrf-token',
-  generateCsrfToken,
-  getCsrfTokenController
+  generateCsrfToken,        // Gera o token e o anexa ao request
+  getCsrfTokenController    // Retorna o token gerado
 );
 
-// Endpoint de submissão de quiz
+// Rota para submeter resultado do quiz
 router.post(
   '/submit-quiz',
-  csrfProtection,       // Middleware para verificar o token CSRF
-  validateQuizPayload,  // Validação de payload usando express-validator
-  sendResult            // Controlador responsável pelo envio de resultado
+  csrfProtection,          // Proteção contra CSRF
+  validateQuizPayload,     // Validação com express-validator
+  sendResult               // Envio do resultado para ActiveCampaign + e-mail
 );
 
 export default router;
