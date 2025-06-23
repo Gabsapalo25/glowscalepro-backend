@@ -1,52 +1,81 @@
-// middleware/errorHandler.js
+// middleware/quizMiddleware.js
 
-import logger from '../utils/logger.js'; // Importa o logger centralizado
+import Joi from 'joi';
+import csurf from 'csurf';
+import logger from '../utils/logger.js'; // Logger centralizado
 
-export const notFound = (req, res, next) => {
-    // Tenta usar o logger da requisição (com requestId) se disponível, senão o global
-    const requestLogger = req.log || logger;
-    const error = new Error(`Not Found - ${req.originalUrl}`);
-    requestLogger.warn(`⚠️ 404 Not Found: ${req.originalUrl}`);
-    res.status(404);
-    next(error);
-};
+// Middleware de proteção CSRF
+export const csrfProtection = csurf({
+  cookie: {
+    key: '_csrf',
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    maxAge: 3600 // 1 hora
+  }
+});
 
-export const errorHandler = (err, req, res, next) => {
-    // Tenta usar o logger da requisição (com requestId) se disponível, senão o global
-    const requestLogger = req.log || logger;
+// Esquema de validação para submissão do quiz
+const quizSubmissionSchema = Joi.object({
+  name: Joi.string().trim().min(2).max(100).required().messages({
+    'string.base': 'Nome deve ser texto.',
+    'string.empty': 'Nome não pode ser vazio.',
+    'string.min': 'Nome deve ter no mínimo {#limit} caracteres.',
+    'string.max': 'Nome deve ter no máximo {#limit} caracteres.',
+    'any.required': 'Nome é obrigatório.'
+  }),
+  email: Joi.string().email().required().messages({
+    'string.email': 'Email inválido.',
+    'string.empty': 'Email não pode ser vazio.',
+    'any.required': 'Email é obrigatório.'
+  }),
+  score: Joi.number().integer().min(0).required().messages({
+    'number.base': 'Pontuação deve ser um número.',
+    'number.integer': 'Pontuação deve ser um número inteiro.',
+    'number.min': 'Pontuação mínima é {#limit}.',
+    'any.required': 'Pontuação é obrigatória.'
+  }),
+  total: Joi.number().integer().min(1).required().messages({
+    'number.base': 'Total deve ser um número.',
+    'number.integer': 'Total deve ser um número inteiro.',
+    'number.min': 'Total mínimo é {#limit}.',
+    'any.required': 'Total é obrigatório.'
+  }),
+  quizId: Joi.string().alphanum().min(3).max(50).required().messages({
+    'string.base': 'ID do quiz deve ser texto.',
+    'string.empty': 'ID do quiz não pode ser vazio.',
+    'string.alphanum': 'ID do quiz deve conter apenas letras e números.',
+    'any.required': 'ID do quiz é obrigatório.'
+  }),
+  countryCode: Joi.string().pattern(/^\+\d{1,3}$/).optional().allow('').messages({
+    'string.pattern.base': 'Código do país inválido (ex: +55).'
+  }),
+  whatsapp: Joi.string().pattern(/^\d{8,15}$/).optional().allow('').messages({
+    'string.pattern.base': 'Número de WhatsApp inválido (apenas dígitos, 8 a 15 caracteres).'
+  }),
+  q4: Joi.string().min(1).max(500).required().messages({
+    'string.base': 'Resposta Q4 deve ser texto.',
+    'string.empty': 'Resposta Q4 não pode ser vazia.',
+    'any.required': 'Resposta Q4 é obrigatória.'
+  }),
+  consent: Joi.boolean().required().valid(true).messages({
+    'boolean.base': 'Consentimento deve ser booleano.',
+    'any.required': 'Consentimento é obrigatório.',
+    'any.only': 'Você deve consentir para continuar.'
+  })
+});
 
-    let statusCode = res.statusCode === 200 ? 500 : res.statusCode;
-    let message = err.message;
+// Middleware de validação da submissão do quiz
+export const validateQuizSubmission = (req, res, next) => {
+  const requestLogger = req.log || logger;
 
-    // Se for um erro de validação (ex: Joi) ou erro de CSRF
-    if (err.name === 'ValidationError') {
-        statusCode = 400;
-        message = err.details ? err.details.map(i => i.message).join(', ') : err.message;
-        requestLogger.error({ error: err, statusCode, message }, '🚫 Validation Error');
-    } else if (err.code === 'EBADCSRFTOKEN') {
-        statusCode = 403; // Forbidden
-        message = 'Invalid CSRF token.';
-        requestLogger.error({ error: err, statusCode, message }, '🚫 CSRF Token Error');
-    } else if (err.isJoi) { // Se você estiver usando Joi para validação
-        statusCode = 400;
-        message = err.details.map(el => el.message).join('; ');
-        requestLogger.error({ error: err, statusCode, message }, '🚫 Joi Validation Error');
-    }
-    
-    // Log do erro com detalhes completos
-    requestLogger.error({
-        error_name: err.name,
-        error_message: message,
-        stack: process.env.NODE_ENV === 'production' ? '🥞 Stack trace in production suppressed.' : err.stack,
-        request_url: req.originalUrl,
-        request_method: req.method,
-        // Incluir outros dados relevantes se existirem (ex: req.body, req.params)
-    }, `❌ Global Error Handler: ${message}`);
+  const { error } = quizSubmissionSchema.validate(req.body, { abortEarly: false });
 
+  if (error) {
+    const errors = error.details.map(err => err.message);
+    requestLogger.error({ validationErrors: errors, body: req.body }, '🚫 Quiz Submission Validation Failed');
+    return res.status(400).json({ errors });
+  }
 
-    res.status(statusCode).json({
-        message: message,
-        // Apenas inclua o stack trace em ambiente de desenvolvimento
-        stack: process.env.NODE_ENV === 'production' ? null : err.stack,
-    });
+  requestLogger.info('✅ Quiz submission data validated successfully.');
+  next();
 };
