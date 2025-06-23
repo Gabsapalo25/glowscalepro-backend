@@ -5,11 +5,11 @@ import { cleanEnv, str, port, bool } from 'envalid';
 
 // Validação das variáveis de ambiente
 const env = cleanEnv(process.env, {
-  EMAIL_HOST: str(), // Mudado de SMTP_HOST para EMAIL_HOST para consistência com quizController.js
-  EMAIL_PORT: port(), // Mudado de SMTP_PORT para EMAIL_PORT
-  EMAIL_SECURE: bool(), // Mudado de SMTP_SECURE para EMAIL_SECURE
-  EMAIL_USER: str(), // Mudado de SMTP_USER para EMAIL_USER
-  EMAIL_PASS: str(), // Mudado de SMTP_PASS para EMAIL_PASS
+  SMTP_HOST: str(), // VOLTOU A SER SMTP_HOST
+  SMTP_PORT: port(), // VOLTOU A SER SMTP_PORT
+  SMTP_SECURE: bool(), // VOLTOU A SER SMTP_SECURE
+  SMTP_USER: str(), // VOLTOU A SER SMTP_USER
+  SMTP_PASS: str(), // VOLTOU A SER SMTP_PASS
   // SMTP_TLS_REJECT_UNAUTHORIZED: bool() // Removido, pois não é usado explicitamente na classe
 });
 
@@ -29,18 +29,19 @@ const logger = pino({
 });
 
 class EmailService {
+  // O construtor agora recebe a config de SMTP diretamente do quizController (process.env.EMAIL_...)
+  // Mas o transporter ainda vai usar as variáveis globais 'env' (SMTP_...)
   constructor(smtpConfig) {
-    // Configuração do transporter usando as variáveis de ambiente ou config passada
     this.transporter = nodemailer.createTransport({
-      host: smtpConfig.host || env.EMAIL_HOST,
-      port: smtpConfig.port || env.EMAIL_PORT,
-      secure: smtpConfig.secure || env.EMAIL_SECURE,
+      host: env.SMTP_HOST, // Usando as variáveis limpas de 'env'
+      port: env.SMTP_PORT,
+      secure: env.SMTP_SECURE,
       auth: {
-        user: smtpConfig.auth.user || env.EMAIL_USER,
-        pass: smtpConfig.auth.pass || env.EMAIL_PASS
+        user: env.SMTP_USER,
+        pass: env.SMTP_PASS
       },
       // tls: {
-      //   rejectUnauthorized: env.SMTP_TLS_REJECT_UNAUTHORIZED // Use se necessário e definido em env
+      //   rejectUnauthorized: env.SMTP_TLS_REJECT_UNAUTHORIZED // Adicione se estiver a usar e se for 'true' em produção
       // }
     });
 
@@ -48,7 +49,6 @@ class EmailService {
     this.transporter.verify((error) => {
       if (error) {
         logger.error(`❌ SMTP connection error: ${error.message}`);
-        // Considerar lançar um erro ou lidar com isso de forma mais robusta no startup
       } else {
         logger.info('✅ SMTP server connected successfully');
       }
@@ -58,13 +58,13 @@ class EmailService {
   async sendEmail({ from, to, subject, html, text }) {
     try {
       const mailOptions = {
-        from: from || `"GlowscalePro" <${env.EMAIL_USER}>`, // Permite sobrescrever o remetente
+        from: from || `"GlowscalePro" <${env.SMTP_USER}>`, // Usando SMTP_USER do env
         to,
         subject,
         html,
-        text: text || html.replace(/<[^>]*>/g, ''), // Fallback para text/plain
+        text: text || html.replace(/<[^>]*>/g, ''),
         headers: {
-          'List-Unsubscribe': '<https://glowscalepro.com/unsubscribe>', // Exemplo, ajuste para o seu domínio
+          'List-Unsubscribe': '<https://glowscalepro.com/unsubscribe>',
           'X-Mailer': 'GlowscaleProMailer/1.0'
         }
       };
@@ -78,4 +78,4 @@ class EmailService {
   }
 }
 
-export default EmailService; // Agora exporta a CLASSE EmailService
+export default EmailService;
