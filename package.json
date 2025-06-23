@@ -28,6 +28,7 @@
     "activecampaign": "^1.2.0",
     "axios": "^1.6.7",
     "cors": "^2.8.5",
+    "csurf": "^1.11.0",
     "dotenv": "^16.4.5",
     "envalid": "^8.0.0",
     "express": "^4.19.2",
@@ -50,10 +51,10 @@
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/Gabsapalo25/glowscalepro-backend.git" 
+    "url": "https://github.com/Gabsapalo25/glowscalepro-backend.git"
   },
   "bugs": {
-    "url": "https://github.com/Gabsapalo25/glowscalepro-backend/issues" 
+    "url": "https://github.com/Gabsapalo25/glowscalepro-backend/issues"
   },
-  "homepage": "https://glowscalepro-backend.onrender.com" 
+  "homepage": "https://glowscalepro-backend.onrender.com"
 }
