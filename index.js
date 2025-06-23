@@ -1,39 +1,47 @@
-// index.js
+// src/index.js - VERSÃO CONJUGADA E ATUALIZADA
 
 import express from 'express';
 import cors from 'cors';
 import pino from 'pino';
-import { cleanEnv, str, port, bool } from 'envalid'; // Importa envalid para validação de variáveis de ambiente
+import { cleanEnv, str, num, port, bool } from 'envalid'; // Importações atualizadas do 'envalid'
+import nodemailer from 'nodemailer'; // Importado 'nodemailer' no topo
 
-import quizRoutes from './routes/quizRoutes.js';
-import { corsOptions } from './config/corsConfig.js'; // Importa as opções de CORS
-import errorHandler from './middleware/errorHandler.js'; // Importa o middleware de tratamento de erros
-import { getQuizConfig } from './config/quizzesConfig.js'; // Importa a configuração dos quizzes
-import { configureRateLimit } from './middleware/quizMiddleware.js'; // Importa a função de configuração de rate limiting
+// Rotas e Middlewares da sua estrutura e nossas implementações
+import quizzesRoutes from './routes/quizzesRoutes.js';
+import mailRoutes from './routes/mailRoutes.js';
+import unsubscribeRoutes from './routes/unsubscribeRoutes.js';
+import errorHandler from './middleware/errorHandler.js'; // Middleware de tratamento de erros
+import { configureRateLimit } from './middleware/quizMiddleware.js'; // Função para configurar rate limit
+import { quizzesConfig } from './config/quizzesConfig.js'; // Sua configuração de quizzes
 
-// 1. Validação e Carregamento das Variáveis de Ambiente com envalid
-// Isso garante que todas as variáveis de ambiente necessárias estejam presentes e corretas no início da aplicação.
+// O 'dotenv.config()' não é necessário; 'envalid' o integra automaticamente.
+
+const app = express();
+
+// 1. Validação de TODAS as Variáveis de Ambiente Necessárias com 'envalid'
 const env = cleanEnv(process.env, {
-    PORT: port({ default: 10000 }), // Porta da aplicação, com default
-    NODE_ENV: str({ choices: ['development', 'production', 'test'], default: 'development' }), // Ambiente, com opções limitadas
-    FRONTEND_URL: str(), // URL do frontend para CORS, obrigatória
-    ADMIN_EMAIL: str({ devDefault: 'admin@example.com' }), // E-mail do administrador, com default para dev
-    EMAIL_HOST: str(), // Host SMTP do e-mail
-    EMAIL_PORT: port(), // Porta SMTP do e-mail
-    EMAIL_SECURE: bool({ default: true }), // Se a conexão SMTP é segura (TLS/SSL)
-    EMAIL_USER: str(), // Usuário do e-mail SMTP
-    EMAIL_PASS: str(), // Senha do e-mail SMTP
-    ACTIVE_CAMPAIGN_API_URL: str(), // URL da API do ActiveCampaign
-    ACTIVE_CAMPAIGN_API_KEY: str(), // Chave da API do ActiveCampaign
-    AC_LIST_ID_MASTERTOOLS_ALL: str(), // ID da lista principal do ActiveCampaign
-    UNSUBSCRIBE_TAG_ID: str(), // ID da tag de "unsubscribe" no ActiveCampaign
-    DEV_API_KEY: str({ devDefault: '' }) // Chave de API para autenticação em desenvolvimento, opcional
+    PORT: port({ devDefault: 10000 }), // Usando tipo 'port' para a porta
+    NODE_ENV: str({ choices: ['development', 'production', 'test'], default: 'development' }),
+    FRONTEND_URL: str(), // Obrigatório
+    ALLOWED_ORIGINS: str({ devDefault: 'http://localhost:3001' }), // Sua variável para CORS
+    ADMIN_EMAIL: str(), // E-mail do administrador
+    EMAIL_HOST: str(), // Renomeado de SMTP_HOST para clareza
+    EMAIL_PORT: port(), // Usando tipo 'port' para a porta SMTP
+    EMAIL_USER: str(), // Renomeado de SMTP_USER
+    EMAIL_PASS: str(), // Renomeado de SMTP_PASS
+    EMAIL_SECURE: bool({ default: true }), // Usando tipo 'bool'
+    EMAIL_TLS_REJECT_UNAUTHORIZED: bool({ default: true }), // Usando tipo 'bool'
+    ACTIVE_CAMPAIGN_API_URL: str(),
+    ACTIVE_CAMPAIGN_API_KEY: str(),
+    AC_LIST_ID_MASTERTOOLS_ALL: num(), // Mantido como 'num' conforme sua definição
+    UNSUBSCRIBE_TAG_ID: num(), // Mantido como 'num' conforme sua definição
+    DEV_API_KEY: str({ devDefault: '' }) // Chave de API para desenvolvimento
 });
 
 // Configuração do Logger (Pino)
 const logger = pino({
-    level: env.isProduction ? 'info' : 'debug', // Nível de log 'info' em produção, 'debug' em desenvolvimento
-    ...(env.isDevelopment && { // Configuração de transporte (pino-pretty) apenas em desenvolvimento
+    level: env.isProduction ? 'info' : 'debug', // Nível de log dinâmico
+    ...(env.isDevelopment && { // Pino-pretty apenas em desenvolvimento
         transport: {
             target: 'pino-pretty',
             options: { colorize: true }
@@ -41,51 +49,97 @@ const logger = pino({
     })
 });
 
-// Inicialização do Aplicativo Express
-const app = express();
+// Middlewares Globais (A ordem é crucial!)
+// Substituindo 'body-parser' pelas funcionalidades nativas do Express
+app.use(express.json()); // Para parsing de JSON
+app.use(express.urlencoded({ extended: true })); // Para parsing de dados de formulário
 
-// DECLARAÇÃO DA PORTA: Certifique-se que esta é a ÚNICA linha que declara 'port'
-const port = env.PORT; // Usa a porta validada por envalid
+// Lógica de CORS customizada (da sua versão do código)
+const allowedOrigins = env.ALLOWED_ORIGINS.split(',').map(origin => origin.trim());
+app.use(cors({
+    origin: function (origin, callback) {
+        if (!origin) return callback(null, true);
+        if (allowedOrigins.indexOf(origin) === -1) {
+            const msg = `The CORS policy for this site does not allow access from the specified Origin: ${origin}`;
+            logger.warn(msg);
+            return callback(new Error(msg), false);
+        }
+        return callback(null, true);
+    },
+    methods: ['GET', 'HEAD', 'PUT', 'PATCH', 'POST', 'DELETE'], // Métodos HTTP permitidos
+    credentials: true // Permite o envio de cookies de credenciais
+}));
 
-// Middlewares Globais (ordem importa!)
-app.use(cors(corsOptions)); // Aplica a política de CORS configurada
-app.use(express.json()); // Habilita o parsing de corpos de requisição no formato JSON
-app.use(express.urlencoded({ extended: true })); // Habilita o parsing de corpos de requisição no formato URL-encoded
-
-// Configura e aplica o Rate Limiting para proteger suas rotas de API
-// Deve ser aplicado ANTES das rotas que ele protege.
+// Aplicando o middleware de Rate Limiting
 configureRateLimit(app);
 
-// Montagem das Rotas da Aplicação
-// Todas as rotas definidas em quizRoutes.js serão prefixadas com '/api'
-app.use('/api', quizRoutes);
+// Adicionando configurações globais à requisição via req.app.locals
+app.use((req, res, next) => {
+    req.app.locals.acApiUrl = env.ACTIVE_CAMPAIGN_API_URL;
+    req.app.locals.acApiKey = env.ACTIVE_CAMPAIGN_API_KEY;
+    req.app.locals.acListIdMastertoolsAll = env.AC_LIST_ID_MASTERTOOLS_ALL;
+    req.app.locals.acTagIdUnsubscribe = env.UNSUBSCRIBE_TAG_ID;
+    req.app.locals.adminEmail = env.ADMIN_EMAIL;
+    req.app.locals.smtpConfig = {
+        host: env.EMAIL_HOST,
+        port: env.EMAIL_PORT,
+        secure: env.EMAIL_SECURE,
+        auth: {
+            user: env.EMAIL_USER,
+            pass: env.EMAIL_PASS,
+        },
+        tls: {
+            rejectUnauthorized: env.EMAIL_TLS_REJECT_UNAUTHORIZED
+        }
+    };
+    next();
+});
 
-// Middleware de Tratamento de Erros Global
-// ESTE DEVE SER SEMPRE O ÚLTIMO MIDDLEWARE A SER ADICIONADO para capturar erros de toda a aplicação.
+// Rotas da Aplicação
+app.use('/api', quizzesRoutes);
+app.use('/api', mailRoutes);
+app.use('/api', unsubscribeRoutes);
+
+// Rota raiz simples para verificar se a API está funcionando
+app.get('/', (req, res) => {
+    res.send('API is running!');
+});
+
+// Middleware de Tratamento de Erros (MUITO IMPORTANTE: DEVE SER O ÚLTIMO MIDDLEWARE ADICIONADO)
 app.use(errorHandler);
 
 // Inicialização do Servidor
-app.listen(port, () => { // Usa a variável 'port' declarada acima
-    logger.info(`Starting server...`);
-    logger.info(`🚀 Server running on port ${port}`);
-    logger.info(`🌎 Environment: ${env.NODE_ENV}`); // Loga o ambiente atual
-    logger.info(`🔗 Frontend URL: ${env.FRONTEND_URL}`); // Loga a URL do frontend
-    logger.info(`🔒 CORS Origin: ${typeof corsOptions.origin === 'function' ? 'dynamic' : corsOptions.origin}`); // Loga a origem CORS
-    logger.info(`✉️ Admin Email: ${env.ADMIN_EMAIL}`); // Loga o e-mail do admin
-    logger.info(`📊 ActiveCampaign: ${env.ACTIVE_CAMPAIGN_API_KEY ? 'Active' : 'Inactive'}`); // Status do ActiveCampaign
-    if (env.ACTIVE_CAMPAIGN_API_KEY) { // Detalhes do ActiveCampaign se ativo
-        logger.info(`    - API URL: ${env.ACTIVE_CAMPAIGN_API_URL}`);
-        logger.info(`    - MasterTools List ID: ${env.AC_LIST_ID_MASTERTOOLS_ALL}`);
-        logger.info(`    - Unsubscribe Tag ID: ${env.UNSUBSCRIBE_TAG_ID}`);
+// ATENÇÃO: 'PORT' está declarado APENAS UMA VEZ aqui.
+const PORT = env.PORT; // Usa a porta validada por 'envalid'
+
+app.listen(PORT, async () => {
+    logger.info('Iniciando o servidor...');
+    logger.info(`🚀 Servidor rodando na porta ${PORT}`);
+    logger.info(`🌎 Ambiente: ${env.NODE_ENV}`);
+    logger.info(`🔗 Frontend URL: ${env.FRONTEND_URL}`);
+    logger.info(`✉️ SMTP: ${env.EMAIL_USER}@${env.EMAIL_HOST}`);
+
+    try {
+        // Teste de conexão SMTP
+        const testTransporter = nodemailer.createTransport(app.locals.smtpConfig);
+        await testTransporter.verify();
+        logger.info('✅ Conexão SMTP verificada com sucesso.');
+    } catch (error) {
+        logger.error(`❌ Erro ao verificar conexão SMTP: ${error.message}`);
+        logger.error(`Detalhes da configuração SMTP: Host=${env.EMAIL_HOST}, Port=${env.EMAIL_PORT}, User=${env.EMAIL_USER}`);
     }
-    logger.info(`✅ Quizzes loaded:`); // Confirma o carregamento das configurações dos quizzes
-    const quizzes = ['tokmate', 'primebiome', 'prodentim', 'nervovive', 'totalcontrol24', 'glucoshield', 'prostadine'];
-    quizzes.forEach(quizId => {
-        const config = getQuizConfig(quizId);
-        if (config) {
-            logger.info(`- ${quizId}: ${config.subject}`);
-        } else {
-            logger.warn(`- ${quizId}: Configuração não encontrada!`); // Alerta se uma config de quiz não for encontrada
-        }
-    });
+
+    logger.info(`📊 ActiveCampaign: ${env.ACTIVE_CAMPAIGN_API_KEY ? 'Ativo' : 'Inativo'}`);
+    logger.info(`    - API URL: ${env.ACTIVE_CAMPAIGN_API_URL}`);
+    logger.info(`    - MasterTools List ID: ${env.AC_LIST_ID_MASTERTOOLS_ALL}`);
+    logger.info(`    - Unsubscribe Tag ID: ${env.UNSUBSCRIBE_TAG_ID}`);
+
+    logger.info('✅ Quizzes carregados:');
+    if (quizzesConfig && Array.isArray(quizzesConfig)) {
+        quizzesConfig.forEach(quiz => {
+            logger.info(`- ${quiz.quizId}: ${quiz.subject} (List ID: ${quiz.activeCampaignFields ? quiz.activeCampaignFields.scoreFieldId : 'Indefinido'})`);
+        });
+    } else {
+        logger.warn('- Nenhuma configuração de quiz encontrada ou estrutura inválida.');
+    }
 });
