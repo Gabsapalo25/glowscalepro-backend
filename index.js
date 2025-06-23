@@ -43,6 +43,8 @@ const logger = pino({
 
 // Inicialização do Aplicativo Express
 const app = express();
+
+// DECLARAÇÃO DA PORTA: Certifique-se que esta é a ÚNICA linha que declara 'port'
 const port = env.PORT; // Usa a porta validada por envalid
 
 // Middlewares Globais (ordem importa!)
@@ -63,7 +65,7 @@ app.use('/api', quizRoutes);
 app.use(errorHandler);
 
 // Inicialização do Servidor
-app.listen(port, () => {
+app.listen(port, () => { // Usa a variável 'port' declarada acima
     logger.info(`Starting server...`);
     logger.info(`🚀 Server running on port ${port}`);
     logger.info(`🌎 Environment: ${env.NODE_ENV}`); // Loga o ambiente atual
