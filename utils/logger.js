@@ -1,61 +1,44 @@
-// utils/logger.js
 import pino from 'pino';
-import path from 'path'; // Para ajudar a encontrar o package.json
-import fs from 'fs'; // Para ler o package.json
-import { fileURLToPath } from 'url'; // Para __dirname em módulos ES
+import { randomUUID } from 'crypto';
 
-// Para obter __dirname em módulos ES
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
+// Detecta ambiente
+const isProd = process.env.NODE_ENV === 'production';
 
-let appVersion = 'unknown';
-try {
-    const packageJsonPath = path.join(__dirname, '..', 'package.json');
-    const packageJson = JSON.parse(fs.readFileSync(packageJsonPath, 'utf8'));
-    appVersion = packageJson.version;
-} catch (error) {
-    // Ignora erros se package.json não puder ser lido, a versão será 'unknown'
-}
+// Configuração bonita em dev, minimalista em prod
+const transport = isProd
+  ? undefined
+  : {
+      target: 'pino-pretty',
+      options: {
+        colorize: true,
+        translateTime: 'yyyy-mm-dd HH:MM:ss',
+        ignore: 'pid,hostname',
+      },
+    };
 
-const logger = pino({
-    level: process.env.LOG_LEVEL || (process.env.NODE_ENV === 'production' ? 'info' : 'debug'),
-    // Adiciona contexto base para todos os logs
+// Logger principal
+const logger = pino(
+  {
+    name: 'GlowscalePro Backend',
+    level: process.env.LOG_LEVEL || 'info',
     base: {
-        app: 'GlowscalePro Backend',
-        version: appVersion,
-        env: process.env.NODE_ENV || 'development',
+      env: process.env.NODE_ENV || 'development',
+      version: '1.0.0',
     },
-    // Configuração do transport condicional para pino-pretty
-    ...(process.env.NODE_ENV !== 'production' && {
-        transport: {
-            target: 'pino-pretty',
-            options: {
-                colorize: true,
-                ignore: 'pid,hostname,app,version,env', // Ignora campos que já adicionamos no formatador
-                translateTime: 'SYS:HH:MM:ss Z', // Timestamp legível
-                // customColors: 'info:green,warn:yellow,error:red,debug:blue', // Exemplo de cores personalizadas
-                messageFormat: '[{app} v{version}] [{env}] {msg}', // Formato da mensagem
-            },
-        },
-    }),
-    // Formatador para logs em produção (JSON)
-    formatters: {
-        level: (label) => ({ level: label }), // Mantém o nível como string (info, error, etc.)
-        log: (obj) => {
-            if (process.env.NODE_ENV === 'production' && obj.time) {
-                obj.timestamp = new Date(obj.time).toISOString(); // Adiciona timestamp ISO para JSON
-            }
-            return obj;
-        }
-    },
-});
-
-// Middleware para adicionar requestId (opcional, se você quiser logar IDs de requisição)
-export const addRequestId = (req, res, next) => {
-    req.requestId = Math.random().toString(36).substring(2, 9); // ID único curto
-    // Adiciona o requestId ao contexto do logger para esta requisição
-    req.log = logger.child({ requestId: req.requestId });
-    next();
-};
+  },
+  transport
+);
 
 export default logger;
+
+// Middleware: adiciona um requestId único e logger contextual à req
+export const addRequestId = (req, res, next) => {
+  const requestId = req.headers['x-request-id'] || randomUUID();
+  req.id = requestId;
+
+  // Cria um logger com contexto do request
+  req.log = logger.child({ requestId, url: req.originalUrl, method: req.method });
+
+  req.log.info('📥 Incoming request');
+  next();
+};
