@@ -2,19 +2,50 @@
 
 import Joi from 'joi';
 import csurf from 'csurf';
-import logger from '../utils/logger.js'; // Logger centralizado
+import cookieParser from 'cookie-parser';
+import logger from '../utils/logger.js';
 
-// Middleware de proteção CSRF
+// ───────────────────────── CSRF Middleware ─────────────────────────
 export const csrfProtection = csurf({
   cookie: {
     key: '_csrf',
     httpOnly: true,
     secure: process.env.NODE_ENV === 'production',
-    maxAge: 3600 // 1 hora
+    maxAge: 3600
   }
 });
 
-// Esquema de validação para submissão do quiz
+export const generateCsrfToken = (req, res, next) => {
+  res.cookie('_csrf', req.csrfToken());
+  req.csrfTokenGenerated = true;
+  next();
+};
+
+// ─────────────────────── Dev Auth Middleware ───────────────────────
+export const devAuthMiddleware = (req, res, next) => {
+  if (process.env.NODE_ENV !== 'development') return next();
+  const devKey = process.env.DEV_API_KEY;
+  const clientKey = req.headers['x-dev-key'];
+
+  if (!clientKey || clientKey !== devKey) {
+    return res.status(401).json({ message: 'Unauthorized - Invalid Dev Key' });
+  }
+
+  next();
+};
+
+// ─────────────────────── Logger Middleware ─────────────────────────
+export const logRequest = (req, res, next) => {
+  const requestLogger = req.log || logger;
+  requestLogger.info({
+    method: req.method,
+    path: req.originalUrl,
+    body: req.body
+  }, '📥 Incoming request');
+  next();
+};
+
+// ─────────────────────── Joi Quiz Validation ───────────────────────
 const quizSubmissionSchema = Joi.object({
   name: Joi.string().trim().min(2).max(100).required().messages({
     'string.base': 'Nome deve ser texto.',
@@ -64,7 +95,6 @@ const quizSubmissionSchema = Joi.object({
   })
 });
 
-// Middleware de validação da submissão do quiz
 export const validateQuizSubmission = (req, res, next) => {
   const requestLogger = req.log || logger;
 
