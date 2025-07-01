@@ -1,64 +1,57 @@
 // controllers/unsubscribeController.js
-
+import axios from "axios";
 import {
-  createOrUpdateContact,
   getContactByEmail,
-  applyTagToContact,
-  removeContactFromList
+  applyTagToContact
 } from "../services/activeCampaignService.js";
 
 import tagMappings from "../data/tagMappings.js";
 import logger from "../utils/logger.js";
 
+const AC_API_KEY = process.env.AC_API_KEY;
+const AC_BASE_URL = process.env.AC_BASE_URL || "https://glowscalepro48745.api-us1.com/api/3";
+
 const TAG_DESCADASTRO_SOLICITADO = tagMappings.specialTags.unsubscribeRequested.id;
 const TAG_DESCADASTRO_CONFIRMADO = tagMappings.specialTags.unsubscribeConfirmed.id;
-const MASTER_LIST_ID = tagMappings.MASTER_LIST_ID;
 
 export async function handleUnsubscribe(req, res) {
   const email = req.query.email || req.body.email;
 
   if (!email || typeof email !== "string") {
     logger.warn(`[UNSUBSCRIBE] 🚫 Email ausente ou inválido: ${email}`);
-    return res.status(400).json({
-      success: false,
-      error: "Missing or invalid email"
-    });
+    return res.status(400).json({ success: false, error: "Missing or invalid email" });
   }
 
   logger.info(`[UNSUBSCRIBE] 📩 Requisição de descadastro recebida para: ${email}`);
 
   try {
-    // 1️⃣ Garante que o contato existe
-    await createOrUpdateContact({ email });
-    logger.debug(`[UNSUBSCRIBE] 🛠️ Contato criado/atualizado com sucesso: ${email}`);
-
-    // 2️⃣ Recupera o contato completo
+    // 🔍 Verifica se o contato existe
     const contact = await getContactByEmail(email);
     if (!contact || !contact.id) {
       logger.warn(`[UNSUBSCRIBE] ❌ Contato não encontrado na ActiveCampaign: ${email}`);
-      return res.status(404).json({
-        success: false,
-        error: "Contact not found in ActiveCampaign"
-      });
+      return res.status(404).json({ success: false, error: "Contact not found in ActiveCampaign" });
     }
 
     const contactId = contact.id;
-    logger.debug(`[UNSUBSCRIBE] ✅ Contato localizado. ID: ${contactId}`);
 
-    // 3️⃣ Aplica tag de descadastro solicitado
-    logger.debug(`[UNSUBSCRIBE] 🏷️ Aplicando tag DESCADASTRO_SOLICITADO (${TAG_DESCADASTRO_SOLICITADO})`);
+    // ✅ Aplica tags de descadastro
     await applyTagToContact(email, TAG_DESCADASTRO_SOLICITADO);
-
-    // 4️⃣ Remove o contato da lista mestre
-    logger.debug(`[UNSUBSCRIBE] 🧹 Removendo da lista mestre ID: ${MASTER_LIST_ID}`);
-    await removeContactFromList(contactId, MASTER_LIST_ID);
-
-    // 5️⃣ Aplica tag de descadastro confirmado
-    logger.debug(`[UNSUBSCRIBE] ✅ Aplicando tag DESCADASTRO_CONFIRMADO (${TAG_DESCADASTRO_CONFIRMADO})`);
     await applyTagToContact(email, TAG_DESCADASTRO_CONFIRMADO);
 
-    // 6️⃣ Responde com sucesso
-    logger.info(`[UNSUBSCRIBE] ✅ Descadastro processado com sucesso para ${email}`);
+    // 📤 Envia status 2 = unsubscribe
+    await axios.post(`${AC_BASE_URL}/contact/sync`, {
+      contact: {
+        email,
+        status: 2 // Desinscrição
+      }
+    }, {
+      headers: {
+        "Api-Token": AC_API_KEY,
+        "Content-Type": "application/json"
+      }
+    });
+
+    logger.info(`[UNSUBSCRIBE] ✅ ${email} descadastrado com sucesso e marcado com TAGs`);
     return res.status(200).json({
       success: true,
       message: "Unsubscribe processed successfully"
@@ -67,7 +60,8 @@ export async function handleUnsubscribe(req, res) {
   } catch (err) {
     logger.error(`[UNSUBSCRIBE] ❌ Erro ao processar descadastro`, {
       message: err.message,
-      stack: err.stack
+      stack: err.stack,
+      email
     });
 
     return res.status(500).json({
