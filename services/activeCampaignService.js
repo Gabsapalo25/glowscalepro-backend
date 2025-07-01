@@ -1,33 +1,32 @@
 // services/activeCampaignService.js
+
 import axios from 'axios';
 import dotenv from 'dotenv';
 import logger from '../utils/logger.js';
 
 dotenv.config();
 
+// 🔧 Configurações
 const AC_BASE_URL = `${process.env.ACTIVE_CAMPAIGN_API_URL}/api/3`;
 const API_KEY = process.env.ACTIVE_CAMPAIGN_API_KEY;
-const MASTER_LIST_ID = parseInt(process.env.MASTER_LIST_ID) || 5;
+const MASTER_LIST_ID = parseInt(process.env.MASTER_LIST_ID || '5');
 
 const headers = {
   'Api-Token': API_KEY,
   'Content-Type': 'application/json',
 };
 
-// 🔹 Cria ou atualiza um contato
+// ✅ Cria ou atualiza um contato
 export async function createOrUpdateContact({ email, name = '', listId = MASTER_LIST_ID }) {
   try {
-    const response = await axios.post(
-      `${AC_BASE_URL}/contacts/sync`,
-      {
-        contact: {
-          email,
-          firstName: name,
-          list: listId,
-        },
+    const response = await axios.post(`${AC_BASE_URL}/contacts/sync`, {
+      contact: {
+        email,
+        firstName: name,
+        list: listId,
       },
-      { headers }
-    );
+    }, { headers });
+
     logger.info(`✅ Contato criado/atualizado: ${email}`);
     return response.data.contact;
   } catch (error) {
@@ -40,7 +39,7 @@ export async function createOrUpdateContact({ email, name = '', listId = MASTER_
   }
 }
 
-// 🔹 Busca um contato por e-mail
+// ✅ Recupera contato por email
 export async function getContactByEmail(email) {
   try {
     const response = await axios.get(`${AC_BASE_URL}/contacts`, {
@@ -48,8 +47,7 @@ export async function getContactByEmail(email) {
       params: { email },
     });
 
-    const contact = response.data.contacts?.[0];
-    return contact || null;
+    return response.data.contacts?.[0] || null;
   } catch (error) {
     logger.error(`❌ Erro ao buscar contato: ${error.message}`, {
       email,
@@ -60,37 +58,36 @@ export async function getContactByEmail(email) {
   }
 }
 
-// 🔹 Aplica uma tag única
+// ✅ Aplica uma tag individual
 export async function applyTagToContact(email, tagId) {
   try {
     const contact = await getContactByEmail(email);
     if (!contact) throw new Error(`Contato com email ${email} não encontrado.`);
 
-    const response = await axios.post(
-      `${AC_BASE_URL}/contactTags`,
-      {
-        contactTag: {
-          contact: contact.id,
-          tag: tagId,
-        },
+    const response = await axios.post(`${AC_BASE_URL}/contactTags`, {
+      contactTag: {
+        contact: contact.id,
+        tag: tagId,
       },
-      { headers }
-    );
+    }, { headers });
+
     logger.info(`🏷️ Tag ${tagId} aplicada ao contato ${email}`);
     return response.data.contactTag;
   } catch (error) {
     if (error.response?.status === 409) {
-      logger.warn(`⚠️ Tag ${tagId} já estava aplicada a ${email}`);
+      logger.warn(`⚠️ Tag ${tagId} já aplicada a ${email}`);
       return { success: true, message: "Tag já aplicada anteriormente" };
     }
+
     logger.error(`❌ Erro ao aplicar tag ${tagId} a ${email}: ${error.message}`);
     throw error;
   }
 }
 
-// 🔹 Aplica várias tags
+// ✅ Aplica múltiplas tags
 export async function applyMultipleTagsToContact(email, tagIds = []) {
   const results = [];
+
   for (const tagId of tagIds) {
     try {
       const result = await applyTagToContact(email, tagId);
@@ -99,19 +96,17 @@ export async function applyMultipleTagsToContact(email, tagIds = []) {
       logger.warn(`⚠️ Falha ao aplicar tag ${tagId} para ${email}: ${err.message}`);
     }
   }
+
   return results;
 }
 
-// 🔹 Remove tag específica
-export async function removeTagFromContact(email, tagId) {
+// ✅ Remove tag de um contato
+export async function removeTagFromContact(contactId, tagId) {
   try {
-    const contact = await getContactByEmail(email);
-    if (!contact) throw new Error(`Contato com email ${email} não encontrado.`);
-
     const tagsResponse = await axios.get(`${AC_BASE_URL}/contactTags`, {
       headers,
       params: {
-        contact: contact.id,
+        contact: contactId,
         tag: tagId,
       },
     });
@@ -119,25 +114,22 @@ export async function removeTagFromContact(email, tagId) {
     const contactTag = tagsResponse.data.contactTags?.[0];
     if (contactTag) {
       await axios.delete(`${AC_BASE_URL}/contactTags/${contactTag.id}`, { headers });
-      logger.info(`🧹 Tag ${tagId} removida de ${email}`);
+      logger.info(`🧹 Tag ${tagId} removida do contato ID: ${contactId}`);
     } else {
-      logger.info(`ℹ️ Nenhuma tag ${tagId} associada ao contato ${email}`);
+      logger.info(`ℹ️ Nenhuma tag ${tagId} associada ao contato ID: ${contactId}`);
     }
   } catch (error) {
-    logger.error(`❌ Erro ao remover tag ${tagId} de ${email}: ${error.message}`);
+    logger.error(`❌ Erro ao remover tag ${tagId} do contato ${contactId}: ${error.message}`);
   }
 }
 
-// 🔹 Remove o contato da lista
-export async function removeContactFromList(email, listId = MASTER_LIST_ID) {
+// ✅ Remove o contato de uma lista
+export async function removeContactFromList(contactId, listId = MASTER_LIST_ID) {
   try {
-    const contact = await getContactByEmail(email);
-    if (!contact) throw new Error(`Contato com email ${email} não encontrado.`);
-
     const response = await axios.get(`${AC_BASE_URL}/contactLists`, {
       headers,
       params: {
-        contact: contact.id,
+        contact: contactId,
         list: listId,
       },
     });
@@ -145,12 +137,14 @@ export async function removeContactFromList(email, listId = MASTER_LIST_ID) {
     const listEntry = response.data.contactLists?.[0];
     if (listEntry) {
       await axios.delete(`${AC_BASE_URL}/contactLists/${listEntry.id}`, { headers });
-      logger.info(`📭 Contato ${email} removido da lista ${listId}`);
+      logger.info(`📭 Contato ID ${contactId} removido da lista ${listId}`);
     } else {
-      logger.info(`ℹ️ Contato ${email} não estava na lista ${listId}`);
+      logger.info(`ℹ️ Contato ID ${contactId} não estava na lista ${listId}`);
     }
   } catch (error) {
-    logger.error(`❌ Erro ao remover contato da lista: ${error.message}`);
+    logger.error(`❌ Erro ao remover contato ID ${contactId} da lista ${listId}: ${error.message}`);
     throw error;
   }
 }
+
+// ✅ A

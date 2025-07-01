@@ -1,6 +1,6 @@
 // services/templates/templates.js
 
-const LOGO_URL = "https://content.app-sources.com/s/406737170044669131/uploads/Images/1-removebg-preview-3444739.png"; 
+const LOGO_URL = "https://content.app-sources.com/s/406737170044669131/uploads/Images/1-removebg-preview-3444739.png";
 
 function baseEmailTemplate({
   productName,
@@ -20,7 +20,7 @@ function baseEmailTemplate({
   return `
     <div style="font-family:Segoe UI,Roboto,Helvetica,Arial,sans-serif;max-width:600px;margin:auto;">
       <!-- Header com logo -->
-      <div style="background-color:#1e3a8a;padding:24px 0;text-align:center;"> 
+      <div style="background-color:#1e3a8a;padding:24px 0;text-align:center;">
         <img src="${LOGO_URL}" alt="GlowscalePro Logo" style="max-width:220px;">
       </div>
 
@@ -45,7 +45,7 @@ function baseEmailTemplate({
 
       <!-- Botão de CTA -->
       <div style="text-align:center;margin:32px 0;">
-        <a href="${affiliateLink}" style="background:${headingColor};color:#ffffff;padding:14px 32px;border-radius:6px;text-decoration:none;font-weight:600;display:inline-block;">
+        <a href="${affiliateLink}" aria-label="Call to action: ${ctaText}" style="background:${headingColor};color:#ffffff;padding:14px 32px;border-radius:6px;text-decoration:none;font-weight:600;display:inline-block;">
           ${ctaText}
         </a>
       </div>

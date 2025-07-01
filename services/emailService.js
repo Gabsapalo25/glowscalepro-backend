@@ -1,4 +1,5 @@
 // services/emailService.js
+
 import nodemailer from 'nodemailer';
 import dotenv from 'dotenv';
 import validator from 'validator';
@@ -6,7 +7,7 @@ import logger from '../utils/logger.js';
 
 dotenv.config();
 
-// 🔒 Validação de variáveis de ambiente
+// 🧪 Validação de variáveis essenciais
 const REQUIRED_VARS = [
   'SMTP_HOST',
   'SMTP_PORT',
@@ -22,11 +23,11 @@ for (const key of REQUIRED_VARS) {
   }
 }
 
-// ✉️ Configuração do transporter
+// ✉️ Configuração do transporte SMTP
 const transporter = nodemailer.createTransport({
   host: process.env.SMTP_HOST,
   port: parseInt(process.env.SMTP_PORT),
-  secure: process.env.SMTP_SECURE === 'true', // true = 465 / false = 587
+  secure: process.env.SMTP_SECURE === 'true', // true: porta 465, false: porta 587
   auth: {
     user: process.env.SMTP_USER,
     pass: process.env.SMTP_PASS
@@ -40,31 +41,33 @@ const transporter = nodemailer.createTransport({
   socketTimeout: 10000
 });
 
-// 🔎 Valida e-mail
+// 🔍 Validação básica de e-mail
 function validateEmail(email) {
   if (!validator.isEmail(email)) {
-    logger.warn(`⚠️ E-mail inválido detectado: ${email}`);
+    logger.warn(`⚠️ E-mail inválido: ${email}`);
     throw new Error(`Formato de e-mail inválido: ${email}`);
   }
 }
 
+// 📬 Serviço de envio de e-mails
 class EmailService {
   /**
-   * Envia e-mail para lead e cópia para admin
+   * Envia e-mail principal (lead) e opcionalmente cópia para o admin
    * @param {Object} options
-   * @param {string} options.to - Destinatário principal
+   * @param {string} options.to - Destinatário
    * @param {string} options.subject - Assunto do e-mail
    * @param {string} options.html - Conteúdo HTML
-   * @param {boolean} [options.copyAdmin=true] - Envia cópia para admin
+   * @param {boolean} [options.copyAdmin=true] - Se deve enviar cópia para o admin
    */
   async sendEmail({ to, subject, html, copyAdmin = true }) {
     try {
       validateEmail(to);
-      const from = process.env.ADMIN_EMAIL;
 
+      const from = process.env.ADMIN_EMAIL;
       const recipients = [to];
-      if (copyAdmin && process.env.ADMIN_EMAIL && to !== process.env.ADMIN_EMAIL) {
-        recipients.push(process.env.ADMIN_EMAIL);
+
+      if (copyAdmin && to !== from) {
+        recipients.push(from);
       }
 
       const mailOptions = {
@@ -80,7 +83,7 @@ class EmailService {
         logger.info(`✅ E-mail enviado para ${recipient}: ${info.messageId}`);
       }
 
-      logger.debug(`📨 Detalhes da entrega:`, {
+      logger.debug("📨 Detalhes da entrega:", {
         accepted: info.accepted,
         rejected: info.rejected,
         response: info.response,
@@ -98,12 +101,12 @@ class EmailService {
   }
 
   /**
-   * Verifica conexão SMTP no início do servidor
+   * Testa a conexão SMTP no startup do servidor
    */
   async testConnection() {
     try {
       await transporter.verify();
-      logger.info('✅ Conexão SMTP verificada com sucesso');
+      logger.info("✅ Conexão SMTP verificada com sucesso");
     } catch (error) {
       logger.error(`❌ Falha ao verificar conexão SMTP: ${error.message}`, {
         code: error.code,
