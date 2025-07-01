@@ -1,45 +1,20 @@
 // routes/quizRoutes.js
-
-import express from 'express';
-
-// Importa os middlewares de validação e segurança do quiz
-import {
-  generateCsrfToken,
-  csrfProtection,
-  devAuthMiddleware,
-  logRequest
-} from '../middleware/quizMiddleware.js';
-
-// Importa o middleware de validação com express-validator
-import { validateQuizPayload } from '../middleware/validateQuizPayload.js';
-
-// Importa os controladores
-import {
-  sendResult,
-  getCsrfToken as getCsrfTokenController
-} from '../controllers/quizController.js';
+import express from "express";
+import { handleQuizSubmission } from "../controllers/quizController.js";
+import { handleExportLeads } from "../controllers/exportController.js";
 
 const router = express.Router();
 
-// Middleware de log (aplicado em todas as rotas)
-router.use(logRequest);
+// Rota para envio de resultado do quiz
+router.post("/send-result", handleQuizSubmission);
 
-// Middleware de autenticação para desenvolvimento (se ativado)
-router.use(devAuthMiddleware);
-
-// Rota para obter o token CSRF
-router.get(
-  '/csrf-token',
-  generateCsrfToken,        // Gera o token e o anexa ao request
-  getCsrfTokenController    // Retorna o token gerado
-);
-
-// Rota para submeter resultado do quiz
-router.post(
-  '/submit-quiz',
-  csrfProtection,          // Proteção contra CSRF
-  validateQuizPayload,     // Validação com express-validator
-  sendResult               // Envio do resultado para ActiveCampaign + e-mail
-);
+// Rota protegida para exportar leads por tagId (ex: /export-leads/10)
+router.get("/export-leads/:tagId", (req, res, next) => {
+  const token = req.headers["x-admin-token"];
+  if (token !== process.env.ADMIN_EXPORT_TOKEN) {
+    return res.status(403).json({ error: "Unauthorized access" });
+  }
+  next();
+}, handleExportLeads);
 
 export default router;

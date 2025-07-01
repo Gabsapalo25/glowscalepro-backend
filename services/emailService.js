@@ -1,68 +1,116 @@
 // services/emailService.js
 import nodemailer from 'nodemailer';
-import pino from 'pino'; // Mantenha esta importação para o 'env' logger se for necessário para depuração da validação
-import { cleanEnv, str, port, bool } from 'envalid';
-import logger from '../utils/logger.js'; // Importa o logger centralizado
+import dotenv from 'dotenv';
+import validator from 'validator';
+import logger from '../utils/logger.js';
 
-// Validação das variáveis de ambiente usando envalid
-const env = cleanEnv(process.env, {
-  SMTP_HOST: str(),
-  SMTP_PORT: port(),
-  SMTP_SECURE: bool(),
-  SMTP_USER: str(),
-  SMTP_PASS: str(),
-  // SMTP_TLS_REJECT_UNAUTHORIZED: bool({ default: false }) // Descomente e use se precisar desta validação
+dotenv.config();
+
+// 🔒 Validação de variáveis de ambiente
+const REQUIRED_VARS = [
+  'SMTP_HOST',
+  'SMTP_PORT',
+  'SMTP_USER',
+  'SMTP_PASS',
+  'ADMIN_EMAIL'
+];
+
+for (const key of REQUIRED_VARS) {
+  if (!process.env[key]) {
+    logger.error(`❌ Variável de ambiente ausente: ${key}`);
+    throw new Error(`Variável de ambiente faltando: ${key}`);
+  }
+}
+
+// ✉️ Configuração do transporter
+const transporter = nodemailer.createTransport({
+  host: process.env.SMTP_HOST,
+  port: parseInt(process.env.SMTP_PORT),
+  secure: process.env.SMTP_SECURE === 'true', // true = 465 / false = 587
+  auth: {
+    user: process.env.SMTP_USER,
+    pass: process.env.SMTP_PASS
+  },
+  tls: {
+    rejectUnauthorized: process.env.SMTP_TLS_REJECT_UNAUTHORIZED !== 'false',
+    minVersion: 'TLSv1.2'
+  },
+  connectionTimeout: 10000,
+  greetingTimeout: 10000,
+  socketTimeout: 10000
 });
 
-class EmailService {
-  constructor() {
-    this.transporter = nodemailer.createTransport({
-      host: env.SMTP_HOST,
-      port: env.SMTP_PORT,
-      secure: env.SMTP_SECURE,
-      auth: {
-        user: env.SMTP_USER,
-        pass: env.SMTP_PASS
-      },
-      // Descomente e ajuste conforme necessário se usar SMTP_TLS_REJECT_UNAUTHORIZED
-      // tls: {
-      //   rejectUnauthorized: env.SMTP_TLS_REJECT_UNAUTHORIZED
-      // }
-    });
-
-    // Verificação inicial do transporter
-    this.transporter.verify((error) => {
-      if (error) {
-        // Usa o logger centralizado
-        logger.error(`❌ SMTP connection error: ${error.message}`);
-      } else {
-        // Usa o logger centralizado
-        logger.info('✅ SMTP server connected successfully');
-      }
-    });
+// 🔎 Valida e-mail
+function validateEmail(email) {
+  if (!validator.isEmail(email)) {
+    logger.warn(`⚠️ E-mail inválido detectado: ${email}`);
+    throw new Error(`Formato de e-mail inválido: ${email}`);
   }
+}
 
-  async sendEmail({ from, to, subject, html, text }) {
+class EmailService {
+  /**
+   * Envia e-mail para lead e cópia para admin
+   * @param {Object} options
+   * @param {string} options.to - Destinatário principal
+   * @param {string} options.subject - Assunto do e-mail
+   * @param {string} options.html - Conteúdo HTML
+   * @param {boolean} [options.copyAdmin=true] - Envia cópia para admin
+   */
+  async sendEmail({ to, subject, html, copyAdmin = true }) {
     try {
+      validateEmail(to);
+      const from = process.env.ADMIN_EMAIL;
+
+      const recipients = [to];
+      if (copyAdmin && process.env.ADMIN_EMAIL && to !== process.env.ADMIN_EMAIL) {
+        recipients.push(process.env.ADMIN_EMAIL);
+      }
+
       const mailOptions = {
-        from: from || `"GlowscalePro" <${env.SMTP_USER}>`,
-        to,
+        from,
+        to: recipients,
         subject,
-        html,
-        text: text || html.replace(/<[^>]*>/g, ''), // Fallback para text/plain
-        headers: {
-          'List-Unsubscribe': '<https://glowscalepro.com/unsubscribe>', // Ajuste para o seu domínio real
-          'X-Mailer': 'GlowscaleProMailer/1.0'
-        }
+        html
       };
 
-      await this.transporter.sendMail(mailOptions);
-      // Usa o logger centralizado
-      logger.info(`✅ Email sent successfully to: ${to}`);
+      const info = await transporter.sendMail(mailOptions);
+
+      for (const recipient of recipients) {
+        logger.info(`✅ E-mail enviado para ${recipient}: ${info.messageId}`);
+      }
+
+      logger.debug(`📨 Detalhes da entrega:`, {
+        accepted: info.accepted,
+        rejected: info.rejected,
+        response: info.response,
+        envelope: info.envelope
+      });
+
     } catch (error) {
-      // Usa o logger centralizado
-      logger.error({ error: error.message, to }, `❌ Failed to send email to ${to}`);
-      throw new Error(`Email sending failed: ${error.message}`);
+      logger.error(`❌ Falha ao enviar e-mail para ${to}: ${error.message}`, {
+        code: error.code,
+        response: error.response,
+        command: error.command
+      });
+      throw error;
+    }
+  }
+
+  /**
+   * Verifica conexão SMTP no início do servidor
+   */
+  async testConnection() {
+    try {
+      await transporter.verify();
+      logger.info('✅ Conexão SMTP verificada com sucesso');
+    } catch (error) {
+      logger.error(`❌ Falha ao verificar conexão SMTP: ${error.message}`, {
+        code: error.code,
+        response: error.response,
+        command: error.command
+      });
+      throw new Error(`Falha de conexão SMTP: ${error.message}`);
     }
   }
 }

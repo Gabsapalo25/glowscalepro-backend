@@ -1,92 +1,72 @@
 // index.js
+import express from "express";
+import cors from "cors";
+import cookieParser from "cookie-parser";
+import csrf from "csurf";
+import dotenv from "dotenv";
+import morgan from "morgan";
+import { handleResubscribe } from "./controllers/resubscribeController.js";
+import { handleUnsubscribe } from "./controllers/unsubscribeController.js";
+import logger from "./utils/logger.js";
 
-import 'dotenv/config';
-import express from 'express';
-import cors from 'cors';
-import helmet from 'helmet';
-import rateLimit from 'express-rate-limit';
-import cookieParser from 'cookie-parser';
-import csurf from 'csurf';
-import quizRoutes from './routes/quizRoutes.js';
-import { notFound, errorHandler } from './middleware/errorHandler.js';
-import logger, { addRequestId } from './utils/logger.js';
-
+dotenv.config();
 const app = express();
+const PORT = process.env.PORT || 10000;
 
-// Middleware para gerar ID de requisição e logger com contexto
-app.use(addRequestId);
-
-// Middlewares para leitura do corpo das requisições
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
-
-// CORS configurado com whitelist de origens confiáveis
-const allowedOrigins = [
-  process.env.FRONTEND_URL,
-  process.env.MASTERTOOLS_UNSUBSCRIBE_URL,
-  'http://localhost:3000',
-  'http://localhost:5173'
-];
-
-app.use(cors({
-  origin: (origin, callback) => {
-    if (!origin) return callback(null, true);
-    if (allowedOrigins.includes(origin)) {
-      return callback(null, true);
-    }
-    const msg = `🚫 CORS: Origin not allowed - ${origin}`;
-    logger.warn({ origin }, msg);
-    return callback(new Error(msg), false);
-  },
+// Middleware CORS
+const corsConfig = {
+  origin: process.env.FRONTEND_URL,
   credentials: true,
-  methods: ['GET', 'POST'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'X-CSRF-Token']
-}));
+  exposedHeaders: ["set-cookie"]
+};
 
-// Segurança com Helmet
-app.use(helmet());
-
-// Rate limiting para evitar abusos
-app.use(rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max: 100,
-  standardHeaders: true,
-  legacyHeaders: false,
-  handler: (req, res) => {
-    req.log.warn('🚨 Rate limit exceeded');
-    res.status(429).json({ message: 'Too many requests. Please try again later.' });
-  }
-}));
-
-// Cookie parser e CSRF protection
-app.use(cookieParser());
-
-app.use(csurf({
+// CSRF Middleware (ajustado para dev/prod)
+const csrfProtection = csrf({
   cookie: {
-    key: '_csrf',
     httpOnly: true,
-    secure: process.env.NODE_ENV === 'production',
-    maxAge: 3600 // 1 hora
+    secure: process.env.NODE_ENV === "production",
+    sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
+    key: "glowscalepro_csrf"
   }
-}));
-
-// Rota de teste (ping)
-app.get('/', (req, res) => {
-  req.log.info('📥 Root endpoint accessed');
-  res.status(200).send('✨ GlowScalePro Backend API is running!');
 });
 
-// Rotas principais
-app.use('/api', quizRoutes);
+// Middlewares na ORDEM CERTA
+app.use(cookieParser());
+app.use(cors(corsConfig));
+app.use(express.json()); // ✅ Antes do csrfProtection
+app.use(csrfProtection);
+app.use(morgan("dev"));
 
-// 404 handler
-app.use(notFound);
+// 🔍 LOG GLOBAL de diagnóstico
+app.use((req, res, next) => {
+  logger.info(`🔥 Request recebida: ${req.method} ${req.originalUrl}`);
+  logger.debug("🔍 Origin:", req.get("Origin"));
+  logger.debug("🔐 Header Token:", req.get("x-csrf-token"));
+  logger.debug("🍪 Cookies:", req.cookies);
+  next();
+});
 
-// Error handler global
-app.use(errorHandler);
+// 🔐 Rota para obter CSRF Token
+app.get("/api/csrf-token", (req, res) => {
+  const token = req.csrfToken();
+  logger.debug("🔐 Generated CSRF Token:", token);
+  res.json({ csrfToken: token });
+});
 
-// Inicialização do servidor
-const PORT = process.env.PORT || 10000;
+// ✅ ROTA DESCADASTRO
+app.post("/api/unsubscribe", handleUnsubscribe);
+
+// ✅ ROTA REATIVAR
+app.post("/api/resubscribe", (req, res, next) => {
+  logger.debug("🧪 BODY recebido:", req.body); // Diagnóstico direto
+  next();
+}, handleResubscribe);
+
+// Inicia o servidor
 app.listen(PORT, () => {
-  logger.info(`🚀 Server running on port ${PORT}`);
+  logger.info("🚀 Server running on port " + PORT, {
+    app: "GlowscalePro",
+    version: "1.0.0",
+    env: process.env.NODE_ENV
+  });
 });

@@ -1,84 +1,48 @@
+GlowscalePro Backend
+Backend Node.js responsável por:
 
-# GlowscalePro Backend
+Processar resultados de quizzes
+Enviar e-mails automáticos (lead + administrador)
+Integrar contatos com o ActiveCampaign via API
+Gerenciar descadastro de leads
+🛠️ Tecnologias Utilizadas
+Node.js
+Express.js
+Nodemailer (via SMTP Zoho)
+ActiveCampaign API v3
+dotenv (variáveis de ambiente)
+cors (CORS protegido)
+csurf (proteção CSRF)
+helmet (segurança HTTP)
+express-rate-limit (proteção contra abuso)
+morgan (logs de requisições)
+📁 Estrutura de Pastas
+bash
 
-Backend Node.js responsável por receber os dados dos quizzes da GlowscalePro, enviar os resultados por e-mail e integrar com o ActiveCampaign.
 
-## 🚀 Tecnologias Utilizadas
-
-- Node.js
-- Express
-- Nodemailer (SMTP Zoho Mail)
-- dotenv
-- ActiveCampaign API
-- CORS
-- body-parser
-
-## 📁 Estrutura de Pastas
-
-```
 glowscalepro-backend/
-│
-├── config/               # Configurações globais
-├── controllers/          # Funções principais de controle (ex: enviar resultado)
-├── data/                 # Armazenamento temporário, mock ou arquivos de apoio
-├── middleware/           # Middlewares (ex: autenticação)
-├── public/               # Recursos públicos, como favicon
-├── routes/               # Definições de rotas (ex: /send-result)
-├── services/             # Serviços externos (ActiveCampaign, SMTP etc)
-├── test/                 # Testes
-├── utils/                # Funções utilitárias
-├── .env                  # Variáveis de ambiente (NÃO versionar)
-├── .env.example          # Exemplo de variáveis de ambiente (versionar)
-├── .gitignore
-├── index.js              # Arquivo principal do servidor
-└── package.json
-```
-
-## ⚙️ Variáveis de Ambiente
-
-Crie um arquivo `.env` com base no `.env.example` e preencha com suas credenciais reais.
-
-## ▶️ Executando o Projeto Localmente
-
-```bash
-npm install
-npm start
-```
-
-O servidor iniciará em `http://localhost:10000` (ou a porta definida na variável `PORT`).
-
-## 📬 Endpoints
-
-### `POST /send-result`
-
-Envia o resultado do quiz por e-mail e integra com o ActiveCampaign.
-
-#### Exemplo de payload:
-
-```json
-{
-  "name": "Gabriel",
-  "email": "gabriel@example.com",
-  "score": 7,
-  "quiz": "NervoVive"
-}
-```
-
-## 🔐 Segurança
-
-- A rota `GET /` (usada para teste de disponibilidade) é protegida com a variável `DEV_API_KEY` no ambiente de desenvolvimento.
-
-## 📦 Deploy
-
-O projeto pode ser hospedado gratuitamente no [Render](https://render.com). Configure as variáveis de ambiente no painel da aplicação.
-
-## 🧪 Testes
-
-Rodar testes (se existirem):
-```bash
-npm test
-```
-
----
-
-© 2025 GlowscalePro. Todos os direitos reservados.
+├── controllers/  
+│   ├── quizController.js         # Processa submissão de quizzes  
+│   └── unsubscribeController.js  # Gerencia descadastro via link  
+├── routes/  
+│   ├── quizRoutes.js             # Rota POST /api/send-result  
+│   └── unsubscribeRoutes.js      # Rota GET /api/unsubscribe  
+├── services/  
+│   ├── activeCampaignService.js  # Integração com ActiveCampaign  
+│   ├── emailService.js           # Envio de e-mails via Nodemailer  
+│   └── templates/  
+│       └── templates.js          # Templates HTML para e-mails  
+├── data/  
+│   └── tagMappings.js            # Mapeamento de quizId → templateKey e TAGs  
+├── .env.example                  # Modelo de variáveis de ambiente  
+├── package.json  
+└── index.js                      # Ponto de entrada da aplicação  
+🧪 Funcionalidades Implementadas
+Recebimento de dados de quizzes via API segura (CSRF protegida)
+Envio de e-mails personalizados ao lead e ao administrador
+Integração com ActiveCampaign :
+Criação/atualização de contatos
+Aplicação de TAGs por produto (quizId) e nível de consciência (awarenessLevel)
+Sistema de descadastro funcional :
+Link no e-mail redireciona para /api/unsubscribe?email=...
+Aplica TAG descadastro-solicitado no ActiveCampaign

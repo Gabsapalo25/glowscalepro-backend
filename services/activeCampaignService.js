@@ -1,158 +1,156 @@
 // services/activeCampaignService.js
-
 import axios from 'axios';
-import logger from '../utils/logger.js'; // Importa o logger centralizado
+import dotenv from 'dotenv';
+import logger from '../utils/logger.js';
 
-class ActiveCampaignService {
-    constructor(apiUrl, apiKey) {
-        if (!apiUrl || !apiKey) {
-            logger.warn('⚠️ ActiveCampaignService initialized without API URL or Key. Operations will be skipped.');
-            this.isEnabled = false;
-            return;
-        }
+dotenv.config();
 
-        this.apiUrl = apiUrl;
-        this.apiKey = apiKey;
-        this.axiosInstance = axios.create({
-            baseURL: `${this.apiUrl}/api/3`,
-            headers: {
-                'Api-Token': this.apiKey,
-                'Content-Type': 'application/json',
-            },
-        });
-        this.isEnabled = true;
-        logger.info('✅ ActiveCampaignService initialized successfully.');
-    }
+const AC_BASE_URL = `${process.env.ACTIVE_CAMPAIGN_API_URL}/api/3`;
+const API_KEY = process.env.ACTIVE_CAMPAIGN_API_KEY;
+const MASTER_LIST_ID = parseInt(process.env.MASTER_LIST_ID) || 5;
 
-    async request(method, endpoint, data = null) {
-        if (!this.isEnabled) {
-            logger.debug(`⏩ ActiveCampaign operation skipped: ${method} ${endpoint} (Service not enabled).`);
-            return null;
-        }
-        try {
-            const config = { method, url: endpoint, data };
-            logger.debug(`⚡ ActiveCampaign API Request: ${method} ${endpoint}`);
-            const response = await this.axiosInstance(config);
-            logger.debug(`✅ ActiveCampaign API Response for ${endpoint}: Status ${response.status}`);
-            return response.data;
-        } catch (error) {
-            if (error.response) {
-                logger.error({
-                    status: error.response.status,
-                    data: error.response.data,
-                    headers: error.response.headers,
-                    endpoint: endpoint,
-                }, `❌ ActiveCampaign API Error for ${endpoint}: ${error.response.statusText}`);
-            } else if (error.request) {
-                logger.error({ request: error.request, endpoint: endpoint }, `❌ ActiveCampaign API No Response for ${endpoint}`);
-            } else {
-                logger.error({ message: error.message, endpoint: endpoint }, `❌ ActiveCampaign API Request Setup Error for ${endpoint}`);
-            }
-            throw new Error(`ActiveCampaign API Error: ${error.message}`);
-        }
-    }
+const headers = {
+  'Api-Token': API_KEY,
+  'Content-Type': 'application/json',
+};
 
-    async createOrUpdateContactAndFields(email, listId, customFields = [], firstName = '', lastName = '') {
-        if (!this.isEnabled) return null;
-
-        let contactData = {
-            contact: {
-                email: email,
-                firstName: firstName,
-                lastName: lastName,
-            }
-        };
-
-        try {
-            logger.debug(`Searching for contact with email: ${email}`);
-            const searchResponse = await this.request('GET', `/contacts?email=${email}`);
-            let contactId;
-
-            if (searchResponse && searchResponse.contacts && searchResponse.contacts.length > 0) {
-                contactId = searchResponse.contacts[0].id;
-                logger.info(`Contact found: ${email} (ID: ${contactId}). Updating...`);
-                // Update existing contact
-                await this.request('PUT', `/contacts/${contactId}`, contactData);
-            } else {
-                logger.info(`Contact not found: ${email}. Creating new contact...`);
-                // Create new contact
-                const createResponse = await this.request('POST', '/contacts', contactData);
-                contactId = createResponse.contact.id;
-            }
-
-            // Ensure contact is associated with the list
-            logger.debug(`Adding contact ${contactId} to list ${listId}...`);
-            await this.request('POST', '/contactLists', {
-                contactList: {
-                    list: listId,
-                    contact: contactId,
-                    status: 1 // 1 for active
-                }
-            });
-
-            // Update custom fields
-            if (customFields.length > 0) {
-                for (const field of customFields) {
-                    if (field.fieldId && field.value !== undefined && field.value !== null) {
-                        logger.debug(`Updating custom field ${field.fieldId} for contact ${contactId} with value: ${field.value}`);
-                        await this.request('POST', '/fieldValues', {
-                            fieldValue: {
-                                contact: contactId,
-                                field: field.fieldId,
-                                value: String(field.value), // Ensure value is a string
-                            }
-                        });
-                    } else {
-                         logger.warn(`Skipping invalid custom field for contact ${contactId}: ${JSON.stringify(field)}`);
-                    }
-                }
-            }
-            logger.info(`Contact ${contactId} created/updated and fields processed successfully.`);
-            return contactId;
-
-        } catch (error) {
-            logger.error({ email, listId, customFields, firstName, error_message: error.message }, '❌ Error in createOrUpdateContactAndFields');
-            throw error;
-        }
-    }
-
-    async addTagToContact(contactId, tagId) {
-        if (!this.isEnabled) return null;
-        try {
-            logger.debug(`Adding tag ${tagId} to contact ${contactId}`);
-            await this.request('POST', '/contactTags', {
-                contactTag: {
-                    contact: contactId,
-                    tag: tagId,
-                },
-            });
-            logger.info(`Tag ${tagId} added to contact ${contactId}.`);
-        } catch (error) {
-            logger.error({ contactId, tagId, error_message: error.message }, '❌ Error adding tag to contact');
-            throw error;
-        }
-    }
-
-    async removeTagFromContact(contactId, tagId) {
-        if (!this.isEnabled) return null;
-        try {
-            // ActiveCampaign API doesn't have a direct "remove by contact and tag ID".
-            // You usually delete the contactTag association.
-            // First, find the contactTag ID
-            const response = await this.request('GET', `/contactTags?contact=${contactId}&tag=${tagId}`);
-            if (response && response.contactTags && response.contactTags.length > 0) {
-                const contactTagId = response.contactTags[0].id;
-                logger.debug(`Removing contactTag ${contactTagId} for contact ${contactId} and tag ${tagId}`);
-                await this.request('DELETE', `/contactTags/${contactTagId}`);
-                logger.info(`Tag ${tagId} removed from contact ${contactId}.`);
-            } else {
-                logger.warn(`Tag ${tagId} not found for contact ${contactId}. No action taken.`);
-            }
-        } catch (error) {
-            logger.error({ contactId, tagId, error_message: error.message }, '❌ Error removing tag from contact');
-            throw error;
-        }
-    }
+// 🔹 Cria ou atualiza um contato
+export async function createOrUpdateContact({ email, name = '', listId = MASTER_LIST_ID }) {
+  try {
+    const response = await axios.post(
+      `${AC_BASE_URL}/contacts/sync`,
+      {
+        contact: {
+          email,
+          firstName: name,
+          list: listId,
+        },
+      },
+      { headers }
+    );
+    logger.info(`✅ Contato criado/atualizado: ${email}`);
+    return response.data.contact;
+  } catch (error) {
+    logger.error(`❌ Erro ao criar/atualizar contato: ${error.message}`, {
+      email,
+      data: error.response?.data,
+      status: error.response?.status,
+    });
+    throw error;
+  }
 }
 
-export default ActiveCampaignService;
+// 🔹 Busca um contato por e-mail
+export async function getContactByEmail(email) {
+  try {
+    const response = await axios.get(`${AC_BASE_URL}/contacts`, {
+      headers,
+      params: { email },
+    });
+
+    const contact = response.data.contacts?.[0];
+    return contact || null;
+  } catch (error) {
+    logger.error(`❌ Erro ao buscar contato: ${error.message}`, {
+      email,
+      data: error.response?.data,
+      status: error.response?.status,
+    });
+    throw error;
+  }
+}
+
+// 🔹 Aplica uma tag única
+export async function applyTagToContact(email, tagId) {
+  try {
+    const contact = await getContactByEmail(email);
+    if (!contact) throw new Error(`Contato com email ${email} não encontrado.`);
+
+    const response = await axios.post(
+      `${AC_BASE_URL}/contactTags`,
+      {
+        contactTag: {
+          contact: contact.id,
+          tag: tagId,
+        },
+      },
+      { headers }
+    );
+    logger.info(`🏷️ Tag ${tagId} aplicada ao contato ${email}`);
+    return response.data.contactTag;
+  } catch (error) {
+    if (error.response?.status === 409) {
+      logger.warn(`⚠️ Tag ${tagId} já estava aplicada a ${email}`);
+      return { success: true, message: "Tag já aplicada anteriormente" };
+    }
+    logger.error(`❌ Erro ao aplicar tag ${tagId} a ${email}: ${error.message}`);
+    throw error;
+  }
+}
+
+// 🔹 Aplica várias tags
+export async function applyMultipleTagsToContact(email, tagIds = []) {
+  const results = [];
+  for (const tagId of tagIds) {
+    try {
+      const result = await applyTagToContact(email, tagId);
+      results.push(result);
+    } catch (err) {
+      logger.warn(`⚠️ Falha ao aplicar tag ${tagId} para ${email}: ${err.message}`);
+    }
+  }
+  return results;
+}
+
+// 🔹 Remove tag específica
+export async function removeTagFromContact(email, tagId) {
+  try {
+    const contact = await getContactByEmail(email);
+    if (!contact) throw new Error(`Contato com email ${email} não encontrado.`);
+
+    const tagsResponse = await axios.get(`${AC_BASE_URL}/contactTags`, {
+      headers,
+      params: {
+        contact: contact.id,
+        tag: tagId,
+      },
+    });
+
+    const contactTag = tagsResponse.data.contactTags?.[0];
+    if (contactTag) {
+      await axios.delete(`${AC_BASE_URL}/contactTags/${contactTag.id}`, { headers });
+      logger.info(`🧹 Tag ${tagId} removida de ${email}`);
+    } else {
+      logger.info(`ℹ️ Nenhuma tag ${tagId} associada ao contato ${email}`);
+    }
+  } catch (error) {
+    logger.error(`❌ Erro ao remover tag ${tagId} de ${email}: ${error.message}`);
+  }
+}
+
+// 🔹 Remove o contato da lista
+export async function removeContactFromList(email, listId = MASTER_LIST_ID) {
+  try {
+    const contact = await getContactByEmail(email);
+    if (!contact) throw new Error(`Contato com email ${email} não encontrado.`);
+
+    const response = await axios.get(`${AC_BASE_URL}/contactLists`, {
+      headers,
+      params: {
+        contact: contact.id,
+        list: listId,
+      },
+    });
+
+    const listEntry = response.data.contactLists?.[0];
+    if (listEntry) {
+      await axios.delete(`${AC_BASE_URL}/contactLists/${listEntry.id}`, { headers });
+      logger.info(`📭 Contato ${email} removido da lista ${listId}`);
+    } else {
+      logger.info(`ℹ️ Contato ${email} não estava na lista ${listId}`);
+    }
+  } catch (error) {
+    logger.error(`❌ Erro ao remover contato da lista: ${error.message}`);
+    throw error;
+  }
+}
