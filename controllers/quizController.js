@@ -1,7 +1,7 @@
 // controllers/quizController.js
 import axios from "axios";
 import { templates } from "../services/templates/templates.js";
-import { sendEmail } from "../services/emailService.js";
+import EmailService from "../services/emailService.js";
 import {
   applyMultipleTagsToContact,
   createOrUpdateContact
@@ -10,6 +10,7 @@ import tagMappings from "../data/tagMappings.js";
 import logger from "../utils/logger.js";
 import validator from "validator";
 
+const emailService = new EmailService();
 const ADMIN_EMAIL = process.env.ADMIN_EMAIL || "sac@glowscalepro.com";
 const MASTER_LIST_ID = parseInt(process.env.MASTER_LIST_ID) || 5;
 
@@ -50,7 +51,7 @@ export async function handleQuizSubmission(req, res) {
 
     // 📧 E-mail para lead
     const emailHtml = templateFn({ name, email, score, total, affiliateLink });
-    await sendEmail({ to: email, subject: "Your Quiz Result is Here 🎯", html: emailHtml });
+    await emailService.sendEmail({ to: email, subject: "Your Quiz Result is Here 🎯", html: emailHtml });
 
     // 📨 E-mail para admin
     const adminEmailHtml = `
@@ -60,7 +61,7 @@ export async function handleQuizSubmission(req, res) {
       <p><strong>Quiz ID:</strong> ${quizId}</p>
       <p><strong>Affiliate Link:</strong> <a href="${affiliateLink}">${affiliateLink}</a></p>
     `;
-    await sendEmail({ to: ADMIN_EMAIL, subject: `[NEW LEAD] ${name} - ${quizId}`, html: adminEmailHtml });
+    await emailService.sendEmail({ to: ADMIN_EMAIL, subject: `[NEW LEAD] ${name} - ${quizId}`, html: adminEmailHtml });
 
     // 🔍 Nível de consciência por score absoluto
     const awarenessLevel = getAwarenessLevelFromScore(score);
