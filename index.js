@@ -7,20 +7,21 @@ import dotenv from "dotenv";
 import morgan from "morgan";
 import { handleResubscribe } from "./controllers/resubscribeController.js";
 import { handleUnsubscribe } from "./controllers/unsubscribeController.js";
+import quizRoutes from "./routes/quizRoutes.js"; // ✅ Importação das rotas do quiz
 import logger from "./utils/logger.js";
 
 dotenv.config();
 const app = express();
 const PORT = process.env.PORT || 10000;
 
-// Middleware CORS
+// 🔓 CORS Middleware
 const corsConfig = {
   origin: process.env.FRONTEND_URL,
   credentials: true,
   exposedHeaders: ["set-cookie"]
 };
 
-// CSRF Middleware (ajustado para dev/prod)
+// 🛡️ CSRF Middleware
 const csrfProtection = csrf({
   cookie: {
     httpOnly: true,
@@ -30,14 +31,14 @@ const csrfProtection = csrf({
   }
 });
 
-// Middlewares na ORDEM CERTA
+// ✅ Ordem dos Middlewares
 app.use(cookieParser());
 app.use(cors(corsConfig));
-app.use(express.json()); // ✅ Antes do csrfProtection
+app.use(express.json());
 app.use(csrfProtection);
 app.use(morgan("dev"));
 
-// 🔍 LOG GLOBAL de diagnóstico
+// 🔥 Log global por request
 app.use((req, res, next) => {
   logger.info(`🔥 Request recebida: ${req.method} ${req.originalUrl}`);
   logger.debug("🔍 Origin:", req.get("Origin"));
@@ -53,16 +54,19 @@ app.get("/api/csrf-token", (req, res) => {
   res.json({ csrfToken: token });
 });
 
-// ✅ ROTA DESCADASTRO
+// ✅ Rota para descadastro (unsubscribe)
 app.post("/api/unsubscribe", handleUnsubscribe);
 
-// ✅ ROTA REATIVAR
+// ✅ Rota para reativar subscrição
 app.post("/api/resubscribe", (req, res, next) => {
-  logger.debug("🧪 BODY recebido:", req.body); // Diagnóstico direto
+  logger.debug("🧪 BODY recebido:", req.body);
   next();
 }, handleResubscribe);
 
-// Inicia o servidor
+// ✅ Rotas dos quizzes e exportação de leads
+app.use("/api", quizRoutes); // ⬅️ ESSENCIAL: conecta /api/send-result e /api/export-leads/:tagId
+
+// ✅ Inicialização do servidor
 app.listen(PORT, () => {
   logger.info("🚀 Server running on port " + PORT, {
     app: "GlowscalePro",
