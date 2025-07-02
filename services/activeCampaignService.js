@@ -1,5 +1,3 @@
-// services/activeCampaignService.js
-
 import axios from 'axios';
 import dotenv from 'dotenv';
 import logger from '../utils/logger.js';
@@ -17,13 +15,12 @@ const headers = {
 };
 
 // ✅ Cria ou atualiza um contato
-export async function createOrUpdateContact({ email, name = '', listId = MASTER_LIST_ID }) {
+export async function createOrUpdateContact({ email, name = '' }) {
   try {
     const response = await axios.post(`${AC_BASE_URL}/contacts/sync`, {
       contact: {
         email,
         firstName: name,
-        list: listId,
       },
     }, { headers });
 
@@ -142,9 +139,32 @@ export async function removeContactFromList(contactId, listId = MASTER_LIST_ID) 
       logger.info(`ℹ️ Contato ID ${contactId} não estava na lista ${listId}`);
     }
   } catch (error) {
-    logger.error(`❌ Erro ao remover contato ID ${contactId} da lista ${listId}: ${error.message}`);
-    throw error;
+    logger.error(`❌ Erro ao remover contato ${contactId} da lista ${listId}: ${error.message}`);
   }
 }
 
-// ✅ A
+// ✅ Adiciona contato a uma lista (reinscrição)
+export async function addContactToList(contactId, listId = MASTER_LIST_ID) {
+  try {
+    const response = await axios.post(`${AC_BASE_URL}/contactLists`, {
+      contactList: {
+        list: listId,
+        contact: contactId,
+        status: 1 // 1 = subscribed
+      }
+    }, { headers });
+
+    logger.info(`📩 Contato ID ${contactId} inscrito na lista ${listId}`);
+    return response.data.contactList;
+  } catch (error) {
+    if (error.response?.status === 409) {
+      logger.warn(`⚠️ Contato ID ${contactId} já inscrito na lista ${listId}`);
+      return { success: true, message: "Já inscrito na lista" };
+    }
+
+    logger.error(`❌ Erro ao adicionar contato ${contactId} à lista ${listId}: ${error.message}`, {
+      data: error.response?.data,
+    });
+    throw error;
+  }
+}

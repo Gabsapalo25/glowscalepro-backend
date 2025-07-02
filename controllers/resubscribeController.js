@@ -8,13 +8,13 @@ export async function handleResubscribe(req, res) {
   try {
     const { email, quizId } = req.body;
 
-    logger.debug("🔍 Dados recebidos para resubscribe", { email, quizId });
+    logger.debug(`🔍 Requisição de reativação recebida`, { email, quizId });
 
-    if (!email || !quizId) {
-      return res.status(400).json({ success: false, error: "Missing email or quizId" });
+    if (!email || typeof email !== "string" || !quizId) {
+      logger.warn(`🚫 Dados ausentes ou inválidos na requisição`, { email, quizId });
+      return res.status(400).json({ success: false, error: "Missing or invalid email or quizId" });
     }
 
-    // 🔎 Buscar contato
     const contact = await ActiveCampaignService.getContactByEmail(email);
     if (!contact || !contact.id) {
       logger.warn(`⚠️ Contato não encontrado para o e-mail: ${email}`);
@@ -22,23 +22,23 @@ export async function handleResubscribe(req, res) {
     }
 
     const contactId = contact.id;
-    const listId = tagMappings.MASTER_LIST_ID;
+    const listId = tagMappings.MASTER_LIST_ID || 5;
     const productTagId = tagMappings.quizIdToTagId[quizId];
 
-    logger.debug("📇 Contato localizado", { contactId, email, listId, productTagId });
+    logger.debug(`📇 Contato localizado`, { contactId, email, listId, productTagId });
 
-    // ✅ Reinscreve o contato na lista mestre
+    // ✅ Reinscreve o contato na lista mestre (se método disponível)
     if (typeof ActiveCampaignService.addContactToList === "function") {
       await ActiveCampaignService.addContactToList(contactId, listId);
-      logger.info(`✅ Contato reinscrito na lista ${listId}: ${email}`);
+      logger.info(`✅ Contato ${email} reinscrito na lista ID ${listId}`);
     }
 
-    // ✅ Reaplica a tag de produto
+    // ✅ Reaplica a tag do produto
     if (productTagId) {
       await ActiveCampaignService.applyTagToContact(email, productTagId);
-      logger.info(`🏷️ Tag de produto reaplicada: ${productTagId} → ${email}`);
+      logger.info(`🏷️ Tag de produto ${productTagId} reaplicada ao contato ${email}`);
     } else {
-      logger.warn(`⚠️ Tag de produto não encontrada para quizId: ${quizId}`);
+      logger.warn(`⚠️ Nenhuma tag mapeada para quizId: ${quizId}`);
     }
 
     // ✅ Remove tags de descadastro
@@ -48,20 +48,24 @@ export async function handleResubscribe(req, res) {
     for (const tag of tagsParaRemover) {
       try {
         await ActiveCampaignService.removeTagFromContact(contactId, tag.id);
-        logger.info(`🧹 Tag '${tag.name}' (ID: ${tag.id}) removida de ${email}`);
+        logger.info(`🧹 Tag '${tag.name}' (ID: ${tag.id}) removida do contato ${email}`);
       } catch (err) {
-        logger.warn(`⚠️ Falha ao remover tag '${tag.name}' de ${email}: ${err.message}`);
+        logger.warn(`⚠️ Erro ao remover tag '${tag.name}' de ${email}: ${err.message}`);
       }
     }
 
-    logger.info(`🔁 Resubscribe processado com sucesso para ${email}`);
+    logger.info(`🔁 Reativação concluída com sucesso para ${email}`);
     return res.status(200).json({ success: true });
 
   } catch (error) {
-    logger.error("❌ ERRO interno em /api/resubscribe", {
+    logger.error(`❌ Erro interno ao processar reativação`, {
       message: error.message,
-      stack: error.stack
+      stack: error.stack,
     });
-    return res.status(500).json({ success: false, error: "Internal server error" });
+
+    return res.status(500).json({
+      success: false,
+      error: "Internal server error while processing resubscribe"
+    });
   }
 }

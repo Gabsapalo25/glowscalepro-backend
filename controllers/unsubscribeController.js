@@ -8,8 +8,8 @@ import {
 import tagMappings from "../data/tagMappings.js";
 import logger from "../utils/logger.js";
 
-const AC_API_KEY = process.env.AC_API_KEY;
-const AC_BASE_URL = process.env.AC_BASE_URL || "https://glowscalepro48745.api-us1.com/api/3";
+const AC_API_KEY = process.env.ACTIVE_CAMPAIGN_API_KEY;
+const AC_BASE_URL = process.env.ACTIVE_CAMPAIGN_API_URL || "https://glowscalepro48745.api-us1.com";
 
 const TAG_DESCADASTRO_SOLICITADO = tagMappings.specialTags.unsubscribeRequested.id;
 const TAG_DESCADASTRO_CONFIRMADO = tagMappings.specialTags.unsubscribeConfirmed.id;
@@ -37,21 +37,24 @@ export async function handleUnsubscribe(req, res) {
     // ✅ Aplica tags de descadastro
     await applyTagToContact(email, TAG_DESCADASTRO_SOLICITADO);
     await applyTagToContact(email, TAG_DESCADASTRO_CONFIRMADO);
+    logger.info(`[UNSUBSCRIBE] ✅ TAGs aplicadas com sucesso ao contato ${email}`);
 
-    // 📤 Envia status 2 = unsubscribe
-    await axios.post(`${AC_BASE_URL}/contact/sync`, {
-      contact: {
-        email,
-        status: 2 // Desinscrição
-      }
-    }, {
-      headers: {
-        "Api-Token": AC_API_KEY,
-        "Content-Type": "application/json"
-      }
-    });
+    // 📤 Remove o contato de todas as listas
+    const headers = { "Api-Token": AC_API_KEY };
 
-    logger.info(`[UNSUBSCRIBE] ✅ ${email} descadastrado com sucesso e marcado com TAGs`);
+    const listRes = await axios.get(`${AC_BASE_URL}/api/3/contacts/${contactId}/contactLists`, { headers });
+    const lists = listRes.data.contactLists || [];
+
+    for (const list of lists) {
+      try {
+        await axios.delete(`${AC_BASE_URL}/api/3/contactLists/${list.id}`, { headers });
+        logger.info(`[UNSUBSCRIBE] 🧹 Contato ${email} removido da lista ID ${list.id}`);
+      } catch (delErr) {
+        logger.warn(`[UNSUBSCRIBE] ⚠️ Falha ao remover ${email} da lista ${list.id}: ${delErr.message}`);
+      }
+    }
+
+    logger.info(`[UNSUBSCRIBE] ✅ ${email} removido de todas as listas e marcado como descadastrado`);
     return res.status(200).json({
       success: true,
       message: "Unsubscribe processed successfully"
