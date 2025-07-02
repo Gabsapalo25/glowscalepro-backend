@@ -19,7 +19,7 @@ function getAwarenessLevelFromScore(score) {
   if (score >= cold.min && score <= cold.max) return "cold";
   if (score >= warm.min && score <= warm.max) return "warm";
   if (score >= hot.min && score <= hot.max) return "hot";
-  return "cold"; // fallback
+  return "cold";
 }
 
 export async function handleQuizSubmission(req, res) {
@@ -51,7 +51,12 @@ export async function handleQuizSubmission(req, res) {
 
     // 📧 E-mail para lead
     const emailHtml = templateFn({ name, email, score, total, affiliateLink });
-    await emailService.sendEmail({ to: email, subject: "Your Quiz Result is Here 🎯", html: emailHtml });
+    try {
+      await emailService.sendEmail({ to: email, subject: "Your Quiz Result is Here 🎯", html: emailHtml });
+      logger.info(`📧 E-mail enviado com sucesso para: ${email}`);
+    } catch (emailError) {
+      logger.error(`❌ Falha ao enviar e-mail para lead: ${email}`, { error: emailError.message });
+    }
 
     // 📨 E-mail para admin
     const adminEmailHtml = `
@@ -61,7 +66,12 @@ export async function handleQuizSubmission(req, res) {
       <p><strong>Quiz ID:</strong> ${quizId}</p>
       <p><strong>Affiliate Link:</strong> <a href="${affiliateLink}">${affiliateLink}</a></p>
     `;
-    await emailService.sendEmail({ to: ADMIN_EMAIL, subject: `[NEW LEAD] ${name} - ${quizId}`, html: adminEmailHtml });
+    try {
+      await emailService.sendEmail({ to: ADMIN_EMAIL, subject: `[NEW LEAD] ${name} - ${quizId}`, html: adminEmailHtml });
+      logger.info(`📨 E-mail enviado para admin: ${ADMIN_EMAIL}`);
+    } catch (adminEmailError) {
+      logger.error(`❌ Falha ao enviar e-mail para admin`, { error: adminEmailError.message });
+    }
 
     // 🔍 Nível de consciência por score absoluto
     const awarenessLevel = getAwarenessLevelFromScore(score);
@@ -87,11 +97,15 @@ export async function handleQuizSubmission(req, res) {
     const levelTagId = tagMappings.awarenessLevelToTagId[awarenessLevel];
     if (levelTagId) tagsToApply.push(levelTagId);
 
-    await applyMultipleTagsToContact(email, tagsToApply, MASTER_LIST_ID);
-    logger.info(`✅ TAGs aplicadas ao contato: ${email}`, {
-      tags: tagsToApply,
-      awarenessLevel
-    });
+    try {
+      await applyMultipleTagsToContact(email, tagsToApply, MASTER_LIST_ID);
+      logger.info(`✅ TAGs aplicadas ao contato: ${email}`, {
+        tags: tagsToApply,
+        awarenessLevel
+      });
+    } catch (tagError) {
+      logger.error(`❌ Erro ao aplicar TAGs para: ${email}`, { error: tagError.message });
+    }
 
     // ✅ Resposta final
     res.status(200).json({

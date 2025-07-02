@@ -1,5 +1,3 @@
-// services/emailService.js
-
 import nodemailer from 'nodemailer';
 import dotenv from 'dotenv';
 import validator from 'validator';
@@ -23,6 +21,12 @@ for (const key of REQUIRED_VARS) {
   }
 }
 
+// ✅ Validação adicional para ADMIN_EMAIL
+if (!validator.isEmail(process.env.ADMIN_EMAIL)) {
+  logger.error(`❌ E-mail do admin inválido: ${process.env.ADMIN_EMAIL}`);
+  throw new Error("E-mail do admin inválido");
+}
+
 // ✉️ Configuração do transporte SMTP
 const transporter = nodemailer.createTransport({
   host: process.env.SMTP_HOST,
@@ -32,6 +36,7 @@ const transporter = nodemailer.createTransport({
     user: process.env.SMTP_USER,
     pass: process.env.SMTP_PASS
   },
+  authMethod: process.env.SMTP_AUTH_METHOD || 'PLAIN', // Ex: 'XOAUTH2' para OAuth
   tls: {
     rejectUnauthorized: process.env.SMTP_TLS_REJECT_UNAUTHORIZED !== 'false',
     minVersion: 'TLSv1.2'
@@ -51,47 +56,51 @@ function validateEmail(email) {
 
 // 📬 Serviço de envio de e-mails
 class EmailService {
-  /**
-   * Envia e-mail principal (lead) e opcionalmente cópia para o admin
-   * @param {Object} options
-   * @param {string} options.to - Destinatário
-   * @param {string} options.subject - Assunto do e-mail
-   * @param {string} options.html - Conteúdo HTML
-   * @param {boolean} [options.copyAdmin=true] - Se deve enviar cópia para o admin
-   */
   async sendEmail({ to, subject, html, copyAdmin = true }) {
     try {
       validateEmail(to);
 
       const from = process.env.ADMIN_EMAIL;
-      const recipients = [to];
 
+      // Enviar para lead
+      try {
+        await transporter.sendMail({
+          from,
+          to,
+          subject,
+          html
+        });
+        logger.info(`✅ E-mail enviado para lead: ${to}`);
+      } catch (leadError) {
+        logger.error(`❌ Falha ao enviar e-mail para lead: ${to}`, {
+          code: leadError.code,
+          response: leadError.response,
+          command: leadError.command
+        });
+        throw leadError;
+      }
+
+      // Enviar cópia para admin (se aplicável)
       if (copyAdmin && to !== from) {
-        recipients.push(from);
+        try {
+          await transporter.sendMail({
+            from,
+            to: from,
+            subject: `[CÓPIA] ${subject}`,
+            html
+          });
+          logger.info(`✅ E-mail enviado para admin: ${from}`);
+        } catch (adminError) {
+          logger.error(`❌ Falha ao enviar e-mail para admin: ${from}`, {
+            code: adminError.code,
+            response: adminError.response,
+            command: adminError.command
+          });
+        }
       }
-
-      const mailOptions = {
-        from,
-        to: recipients,
-        subject,
-        html
-      };
-
-      const info = await transporter.sendMail(mailOptions);
-
-      for (const recipient of recipients) {
-        logger.info(`✅ E-mail enviado para ${recipient}: ${info.messageId}`);
-      }
-
-      logger.debug("📨 Detalhes da entrega:", {
-        accepted: info.accepted,
-        rejected: info.rejected,
-        response: info.response,
-        envelope: info.envelope
-      });
 
     } catch (error) {
-      logger.error(`❌ Falha ao enviar e-mail para ${to}: ${error.message}`, {
+      logger.error(`❌ Erro crítico no envio de e-mail: ${error.message}`, {
         code: error.code,
         response: error.response,
         command: error.command
@@ -100,9 +109,6 @@ class EmailService {
     }
   }
 
-  /**
-   * Testa a conexão SMTP no startup do servidor
-   */
   async testConnection() {
     try {
       await transporter.verify();

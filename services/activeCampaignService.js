@@ -9,18 +9,25 @@ const AC_BASE_URL = `${process.env.ACTIVE_CAMPAIGN_API_URL}/api/3`;
 const API_KEY = process.env.ACTIVE_CAMPAIGN_API_KEY;
 const MASTER_LIST_ID = parseInt(process.env.MASTER_LIST_ID || '5');
 
+// ✅ Validação de variáveis
+if (!AC_BASE_URL || !API_KEY) {
+  logger.error("❌ Configuração do ActiveCampaign ausente");
+  throw new Error("ActiveCampaign não configurado");
+}
+
 const headers = {
   'Api-Token': API_KEY,
   'Content-Type': 'application/json',
 };
 
-// ✅ Cria ou atualiza um contato
+// ✅ Cria ou atualiza um contato (com listId)
 export async function createOrUpdateContact({ email, name = '' }) {
   try {
     const response = await axios.post(`${AC_BASE_URL}/contacts/sync`, {
       contact: {
         email,
         firstName: name,
+        listId: MASTER_LIST_ID // Adiciona à lista principal
       },
     }, { headers });
 
@@ -55,7 +62,7 @@ export async function getContactByEmail(email) {
   }
 }
 
-// ✅ Aplica uma tag individual
+// ✅ Aplica uma tag individual (exportada corretamente)
 export async function applyTagToContact(email, tagId) {
   try {
     const contact = await getContactByEmail(email);
