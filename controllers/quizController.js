@@ -1,4 +1,5 @@
 // controllers/quizController.js
+
 import axios from "axios";
 import { templates } from "../services/templates/templates.js";
 import EmailService from "../services/emailService.js";
@@ -23,6 +24,8 @@ function getAwarenessLevelFromScore(score) {
 }
 
 export async function handleQuizSubmission(req, res) {
+  logger.info("📥 Requisição recebida no /send-result", { body: req.body });
+
   let email;
 
   try {
@@ -35,9 +38,19 @@ export async function handleQuizSubmission(req, res) {
       return res.status(400).json({ success: false, message: "Campos obrigatórios ausentes" });
     }
 
+    // ✅ Validação de e-mail
     if (!validator.isEmail(email)) {
       logger.warn(`⚠️ E-mail inválido detectado: ${email}`);
       return res.status(400).json({ success: false, message: "Formato de e-mail inválido" });
+    }
+
+    // ✅ Score e total devem ser números válidos
+    const parsedScore = parseInt(score);
+    const parsedTotal = parseInt(total);
+
+    if (isNaN(parsedScore) || isNaN(parsedTotal)) {
+      logger.warn("⚠️ Score ou total inválido (não numérico)", { score, total });
+      return res.status(400).json({ success: false, message: "Score ou total inválido" });
     }
 
     // 📄 Template por quizId
@@ -50,7 +63,7 @@ export async function handleQuizSubmission(req, res) {
     }
 
     // 📧 E-mail para lead
-    const emailHtml = templateFn({ name, email, score, total, affiliateLink });
+    const emailHtml = templateFn({ name, email, score: parsedScore, total: parsedTotal, affiliateLink });
     try {
       await emailService.sendEmail({ to: email, subject: "Your Quiz Result is Here 🎯", html: emailHtml });
       logger.info(`📧 E-mail enviado com sucesso para: ${email}`);
@@ -62,7 +75,7 @@ export async function handleQuizSubmission(req, res) {
     const adminEmailHtml = `
       <p><strong>Name:</strong> ${name}</p>
       <p><strong>Email:</strong> ${email}</p>
-      <p><strong>Score:</strong> ${score}/${total}</p>
+      <p><strong>Score:</strong> ${parsedScore}/${parsedTotal}</p>
       <p><strong>Quiz ID:</strong> ${quizId}</p>
       <p><strong>Affiliate Link:</strong> <a href="${affiliateLink}">${affiliateLink}</a></p>
     `;
@@ -74,11 +87,11 @@ export async function handleQuizSubmission(req, res) {
     }
 
     // 🔍 Nível de consciência por score absoluto
-    const awarenessLevel = getAwarenessLevelFromScore(score);
-    logger.debug(`🔍 Nível de consciência para score ${score}: ${awarenessLevel}`);
+    const awarenessLevel = getAwarenessLevelFromScore(parsedScore);
+    logger.debug(`🔍 Nível de consciência para score ${parsedScore}: ${awarenessLevel}`);
 
     // 👤 Cria ou atualiza o contato
-    const contact = await createOrUpdateContact({ email, name, listId: MASTER_LIST_ID });
+    const contact = await createOrUpdateContact({ email, name });
 
     if (!contact) {
       logger.warn(`⚠️ Contato não encontrado após criação: ${email}`);
@@ -98,7 +111,7 @@ export async function handleQuizSubmission(req, res) {
     if (levelTagId) tagsToApply.push(levelTagId);
 
     try {
-      await applyMultipleTagsToContact(email, tagsToApply, MASTER_LIST_ID);
+      await applyMultipleTagsToContact(email, tagsToApply);
       logger.info(`✅ TAGs aplicadas ao contato: ${email}`, {
         tags: tagsToApply,
         awarenessLevel
@@ -106,6 +119,13 @@ export async function handleQuizSubmission(req, res) {
     } catch (tagError) {
       logger.error(`❌ Erro ao aplicar TAGs para: ${email}`, { error: tagError.message });
     }
+
+    // ✅ Log final de sucesso
+    logger.info(`✅ Submissão concluída para: ${email}`, {
+      awarenessLevel,
+      quizId,
+      tagsApplied: tagsToApply
+    });
 
     // ✅ Resposta final
     res.status(200).json({
