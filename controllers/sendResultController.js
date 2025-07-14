@@ -15,7 +15,7 @@ const emailService = new EmailService();
 
 export async function handleSendResult(req, res) {
   try {
-    const { name, email, score, total, quizId, cta_url } = req.body;
+    const { name, email, score, total, quizId, cta_url, whatsapp } = req.body;
 
     logger.info(`📥 Novo lead recebido: ${email} - Quiz: ${quizId} - Score: ${score}/${total}`);
 
@@ -26,11 +26,15 @@ export async function handleSendResult(req, res) {
       });
     }
 
-    // 1️⃣ Criação ou atualização do contato
-    const contact = await createOrUpdateContact({ email, name });
+    // 1️⃣ Criação ou atualização do contato (agora com telefone)
+    const contact = await createOrUpdateContact({
+      email,
+      name,
+      phone: whatsapp || undefined // opcional
+    });
 
-    // 2️⃣ Determina o nível de consciência com base no score ABSOLUTO
-    let awarenessLevel = "cold"; // default
+    // 2️⃣ Determina o nível de consciência com base no score
+    let awarenessLevel = "cold";
     for (const level in tagMappings.scoreToAwarenessLevel) {
       const range = tagMappings.scoreToAwarenessLevel[level];
       if (score >= range.min && score <= range.max) {
