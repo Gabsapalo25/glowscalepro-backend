@@ -1,0 +1,9 @@
+{
+  "johndoe@example.com": {
+    "primebiome": {
+      "status": "reminder_sent",
+      "sent_at": "2025-07-05T10:00:00.000Z",
+      "reminder_sent_at": "2025-07-07T14:06:08.829Z"
+    }
+  }
+}
