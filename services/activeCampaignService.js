@@ -22,7 +22,6 @@ const headers = {
 // 🔁 Cria ou atualiza contato com segurança
 export async function createOrUpdateContact({ email, name, phone = null, customFields = {} }) {
   try {
-    // 1️⃣ Verifica se já existe
     const searchRes = await axios.get(`${AC_BASE_URL}/contacts?email=${email}`, { headers });
     const existingContact = searchRes.data.contacts?.[0];
 
@@ -41,10 +40,8 @@ export async function createOrUpdateContact({ email, name, phone = null, customF
       };
 
       await axios.put(`${AC_BASE_URL}/contacts/${existingContact.id}`, updatePayload, { headers });
-
       return existingContact;
     } else {
-      // 2️⃣ Cria novo contato
       logger.info(`🆕 Criando novo contato: ${email}`);
 
       const createPayload = {
@@ -64,6 +61,40 @@ export async function createOrUpdateContact({ email, name, phone = null, customF
     }
   } catch (error) {
     logger.error(`❌ Erro no createOrUpdateContact: ${error.message}`, {
+      data: error.response?.data
+    });
+    throw error;
+  }
+}
+
+// 🔍 Obtém contato por email
+export async function getContactByEmail(email) {
+  try {
+    const response = await axios.get(`${AC_BASE_URL}/contacts?email=${email}`, { headers });
+    const contact = response.data.contacts?.[0];
+    return contact || null;
+  } catch (error) {
+    logger.error(`❌ Erro ao buscar contato por email (${email}): ${error.message}`);
+    throw error;
+  }
+}
+
+// 🏷️ Aplica uma tag a um contato
+export async function applyTagToContact(contactId, tagId) {
+  try {
+    const payload = {
+      contactTag: {
+        contact: contactId,
+        tag: tagId
+      }
+    };
+
+    const response = await axios.post(`${AC_BASE_URL}/contactTags`, payload, { headers });
+
+    logger.info(`🏷️ Tag ${tagId} aplicada ao contato ${contactId}`);
+    return response.data.contactTag;
+  } catch (error) {
+    logger.error(`❌ Erro ao aplicar tag ao contato ${contactId}: ${error.message}`, {
       data: error.response?.data
     });
     throw error;

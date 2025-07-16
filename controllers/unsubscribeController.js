@@ -1,4 +1,5 @@
 // controllers/unsubscribeController.js
+
 import axios from "axios";
 import {
   getContactByEmail,
@@ -25,7 +26,6 @@ export async function handleUnsubscribe(req, res) {
   logger.info(`[UNSUBSCRIBE] 📩 Requisição de descadastro recebida para: ${email}`);
 
   try {
-    // 🔍 Verifica se o contato existe
     const contact = await getContactByEmail(email);
     if (!contact || !contact.id) {
       logger.warn(`[UNSUBSCRIBE] ❌ Contato não encontrado na ActiveCampaign: ${email}`);
@@ -35,8 +35,8 @@ export async function handleUnsubscribe(req, res) {
     const contactId = contact.id;
 
     // ✅ Aplica tags de descadastro
-    await applyTagToContact(email, TAG_DESCADASTRO_SOLICITADO);
-    await applyTagToContact(email, TAG_DESCADASTRO_CONFIRMADO);
+    await applyTagToContact(contactId, TAG_DESCADASTRO_SOLICITADO);
+    await applyTagToContact(contactId, TAG_DESCADASTRO_CONFIRMADO);
     logger.info(`[UNSUBSCRIBE] ✅ TAGs aplicadas com sucesso ao contato ${email}`);
 
     // 📤 Remove o contato de todas as listas

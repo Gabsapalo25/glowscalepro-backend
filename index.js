@@ -1,4 +1,3 @@
-// index.js
 import express from "express";
 import cors from "cors";
 import cookieParser from "cookie-parser";
@@ -7,7 +6,8 @@ import dotenv from "dotenv";
 import morgan from "morgan";
 import { handleResubscribe } from "./controllers/resubscribeController.js";
 import { handleUnsubscribe } from "./controllers/unsubscribeController.js";
-import quizRoutes from "./routes/quizRoutes.js"; // ✅ Importação das rotas do quiz
+import quizRoutes from "./routes/quizRoutes.js";
+import logRoute from "./routes/logRoute.js"; // ✅ Nova rota de log
 import logger from "./utils/logger.js";
 
 dotenv.config();
@@ -64,7 +64,10 @@ app.post("/api/resubscribe", (req, res, next) => {
 }, handleResubscribe);
 
 // ✅ Rotas dos quizzes e exportação de leads
-app.use("/api", quizRoutes); // ⬅️ ESSENCIAL: conecta /api/send-result e /api/export-leads/:tagId
+app.use("/api", quizRoutes);
+
+// ✅ Nova rota de logging do frontend
+app.use("/api/log", logRoute);
 
 // ✅ Inicialização do servidor
 app.listen(PORT, () => {
