@@ -1,61 +1,48 @@
 // controllers/quizController.js
-import nodemailer from "nodemailer";
-import quizzesConfig from "../config/quizzesConfig.js";
+
 import fs from "fs";
 import path from "path";
-import {
-  addContactToActiveCampaign,
-  addTagToContact,
-} from "../services/activeCampaignServices.js";
+import { fileURLToPath } from "url";
+import { createOrUpdateContact, applyTagToContact } from "../services/activeCampaign.js";
 
-const dataPath = path.resolve("./config/data.json");
+// Corrigindo __dirname para ES Modules
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
+// Caminho do arquivo de dados
+const dataPath = path.join(__dirname, "../data/data.json");
+
+// Função principal para lidar com o resultado do quiz
 export const handleQuizResult = async (req, res) => {
-  const { email, name, quizId, result, tagId } = req.body;
-
   try {
-    const quiz = quizzesConfig[quizId];
+    const { name, email, tagId } = req.body;
 
-    if (!quiz) {
-      return res.status(400).json({ error: "Invalid quiz ID" });
+    // Verifica se todos os campos estão presentes
+    if (!name || !email || !tagId) {
+      return res.status(400).json({ error: "Missing required fields" });
     }
 
-    // Adiciona o lead à ActiveCampaign
-    const contact = await addContactToActiveCampaign({ email, name });
+    // Adiciona ou atualiza o contato no ActiveCampaign
+    await createOrUpdateContact({ email, name });
 
-    // Adiciona a tag (se fornecida)
-    if (tagId && contact && contact.id) {
-      await addTagToContact(contact.id, tagId);
+    // Aplica a tag ao contato
+    await applyTagToContact(email, tagId);
+
+    // Salva no data.json local
+    const newLead = { name, email, tagId, date: new Date().toISOString() };
+
+    let data = [];
+    if (fs.existsSync(dataPath)) {
+      const fileContent = fs.readFileSync(dataPath, "utf-8");
+      data = JSON.parse(fileContent);
     }
 
-    // Envia o e-mail com base no resultado do quiz
-    const transporter = nodemailer.createTransport({
-      host: process.env.SMTP_HOST,
-      port: parseInt(process.env.SMTP_PORT),
-      secure: false,
-      auth: {
-        user: process.env.SMTP_USER,
-        pass: process.env.SMTP_PASS,
-      },
-    });
+    data.push(newLead);
+    fs.writeFileSync(dataPath, JSON.stringify(data, null, 2), "utf-8");
 
-    const mailOptions = {
-      from: `"GlowScalePRO" <${process.env.SMTP_USER}>`,
-      to: email,
-      subject: quiz.emailSubject,
-      html: quiz.emailTemplates[result] || quiz.defaultTemplate,
-    };
-
-    await transporter.sendMail(mailOptions);
-
-    // Salva o lead no arquivo local (apenas como backup)
-    const existingData = JSON.parse(fs.readFileSync(dataPath, "utf8"));
-    existingData.push({ name, email, quizId, result, date: new Date().toISOString() });
-    fs.writeFileSync(dataPath, JSON.stringify(existingData, null, 2));
-
-    res.status(200).json({ success: true });
+    res.status(200).json({ message: "Lead processed successfully" });
   } catch (error) {
-    console.error("Erro ao processar resultado do quiz:", error);
+    console.error("Error processing quiz result:", error);
     res.status(500).json({ error: "Internal server error" });
   }
 };
