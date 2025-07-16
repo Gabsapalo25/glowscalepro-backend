@@ -17,10 +17,9 @@ const headers = {
   'Content-Type': 'application/json',
 };
 
-// 🔁 Cria ou atualiza contato com segurança
-export async function createOrUpdateContact({ email, name, phone = null, customFields = {} }) {
+// 🔁 Cria ou atualiza contato
+async function createOrUpdateContact({ email, name, phone = null, customFields = {} }) {
   try {
-    // 1️⃣ Verifica se já existe
     const searchRes = await axios.get(`${AC_BASE_URL}/contacts?email=${email}`, { headers });
     const existingContact = searchRes.data.contacts?.[0];
 
@@ -42,7 +41,6 @@ export async function createOrUpdateContact({ email, name, phone = null, customF
 
       return existingContact;
     } else {
-      // 2️⃣ Cria novo contato
       logger.info(`🆕 Criando novo contato: ${email}`);
 
       const createPayload = {
@@ -69,7 +67,7 @@ export async function createOrUpdateContact({ email, name, phone = null, customF
 }
 
 // 🔍 Busca contato pelo e-mail
-export async function getContactByEmail(email) {
+async function getContactByEmail(email) {
   try {
     const response = await axios.get(`${AC_BASE_URL}/contacts?email=${email}`, { headers });
     return response.data.contacts?.[0] || null;
@@ -81,10 +79,9 @@ export async function getContactByEmail(email) {
   }
 }
 
-// 🏷️ Aplica uma tag ao contato (por e-mail)
-export async function applyTagToContact(email, tagId) {
+// 🏷️ Aplica uma tag a um contato
+async function applyTagToContact(email, tagId) {
   try {
-    // Busca o contato pelo e-mail
     const contact = await getContactByEmail(email);
     if (!contact || !contact.id) {
       throw new Error(`Contato não encontrado para o e-mail: ${email}`);
@@ -106,3 +103,22 @@ export async function applyTagToContact(email, tagId) {
     throw error;
   }
 }
+
+// 🏷️ Aplica várias tags em sequência
+async function applyMultipleTagsToContact(email, tagIds = []) {
+  for (const tagId of tagIds) {
+    try {
+      await applyTagToContact(email, tagId);
+    } catch (err) {
+      logger.warn(`⚠️ Falha ao aplicar tag ${tagId} para ${email}: ${err.message}`);
+    }
+  }
+}
+
+// ✅ Exporta todas as funções utilizadas em controllers
+export {
+  createOrUpdateContact,
+  getContactByEmail,
+  applyTagToContact,
+  applyMultipleTagsToContact
+};
