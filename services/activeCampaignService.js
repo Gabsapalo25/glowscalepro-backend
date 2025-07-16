@@ -1,5 +1,3 @@
-// services/activeCampaignService.js
-
 import axios from 'axios';
 import dotenv from 'dotenv';
 import logger from '../utils/logger.js';
@@ -22,6 +20,7 @@ const headers = {
 // 🔁 Cria ou atualiza contato com segurança
 export async function createOrUpdateContact({ email, name, phone = null, customFields = {} }) {
   try {
+    // 1️⃣ Verifica se já existe
     const searchRes = await axios.get(`${AC_BASE_URL}/contacts?email=${email}`, { headers });
     const existingContact = searchRes.data.contacts?.[0];
 
@@ -40,8 +39,10 @@ export async function createOrUpdateContact({ email, name, phone = null, customF
       };
 
       await axios.put(`${AC_BASE_URL}/contacts/${existingContact.id}`, updatePayload, { headers });
+
       return existingContact;
     } else {
+      // 2️⃣ Cria novo contato
       logger.info(`🆕 Criando novo contato: ${email}`);
 
       const createPayload = {
@@ -67,34 +68,39 @@ export async function createOrUpdateContact({ email, name, phone = null, customF
   }
 }
 
-// 🔍 Obtém contato por email
+// 🔍 Busca contato pelo e-mail
 export async function getContactByEmail(email) {
   try {
     const response = await axios.get(`${AC_BASE_URL}/contacts?email=${email}`, { headers });
-    const contact = response.data.contacts?.[0];
-    return contact || null;
+    return response.data.contacts?.[0] || null;
   } catch (error) {
-    logger.error(`❌ Erro ao buscar contato por email (${email}): ${error.message}`);
+    logger.error(`❌ Erro ao buscar contato: ${error.message}`, {
+      data: error.response?.data
+    });
     throw error;
   }
 }
 
-// 🏷️ Aplica uma tag a um contato
-export async function applyTagToContact(contactId, tagId) {
+// 🏷️ Aplica uma tag ao contato (por e-mail)
+export async function applyTagToContact(email, tagId) {
   try {
-    const payload = {
+    // Busca o contato pelo e-mail
+    const contact = await getContactByEmail(email);
+    if (!contact || !contact.id) {
+      throw new Error(`Contato não encontrado para o e-mail: ${email}`);
+    }
+
+    const tagPayload = {
       contactTag: {
-        contact: contactId,
+        contact: contact.id,
         tag: tagId
       }
     };
 
-    const response = await axios.post(`${AC_BASE_URL}/contactTags`, payload, { headers });
-
-    logger.info(`🏷️ Tag ${tagId} aplicada ao contato ${contactId}`);
-    return response.data.contactTag;
+    await axios.post(`${AC_BASE_URL}/contactTags`, tagPayload, { headers });
+    logger.info(`🏷️ Tag ${tagId} aplicada ao contato ${email}`);
   } catch (error) {
-    logger.error(`❌ Erro ao aplicar tag ao contato ${contactId}: ${error.message}`, {
+    logger.error(`❌ Erro ao aplicar tag ${tagId} ao contato ${email}: ${error.message}`, {
       data: error.response?.data
     });
     throw error;
