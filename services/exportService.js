@@ -1,8 +1,6 @@
+// services/exportService.js
 import axios from "axios";
 import { Parser } from "json2csv";
-import dotenv from "dotenv";
-
-dotenv.config();
 
 const ACTIVE_CAMPAIGN_API_KEY = process.env.ACTIVE_CAMPAIGN_API_KEY;
 const ACTIVE_CAMPAIGN_API_URL = process.env.ACTIVE_CAMPAIGN_API_URL;
@@ -12,8 +10,7 @@ const headers = {
   "Content-Type": "application/json"
 };
 
-// ✅ Corrigido: função nomeada conforme usada no quizController.js
-export async function exportLeadsByTag(tagId) {
+async function exportContactsByTag(tagId) {
   const allContacts = [];
   let offset = 0;
   const limit = 100;
@@ -35,6 +32,7 @@ export async function exportLeadsByTag(tagId) {
     offset += limit;
   }
 
+  // Mapear os campos desejados
   const formatted = allContacts.map(c => ({
     Name: c.firstName || "",
     Email: c.email,
@@ -42,6 +40,9 @@ export async function exportLeadsByTag(tagId) {
     Tags: (c.tags || []).join(", ")
   }));
 
+  // Converter para CSV
   const parser = new Parser();
   return parser.parse(formatted);
 }
+
+export { exportContactsByTag };
