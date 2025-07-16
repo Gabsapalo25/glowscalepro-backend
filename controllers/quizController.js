@@ -1,10 +1,10 @@
 // controllers/quizController.js
 
 import { createOrUpdateContact, applyMultipleTagsToContact } from '../services/activeCampaignService.js';
-import emailService from '../services/emailService.js'; // ✅ já é uma instância
+import emailService from '../services/emailService.js';
 import tagMappings from '../data/tagMappings.js';
 import logger from '../utils/logger.js';
-import { exportLeadsByTag } from '../services/exportService.js';
+import { exportContactsByTag } from '../services/exportService.js'; // ✅ CORRIGIDO
 
 export async function handleQuizResult(req, res) {
   const { email, name, phone, quizId, awarenessLevel } = req.body;
@@ -37,10 +37,12 @@ export async function handleQuizResult(req, res) {
     await emailService.sendEmail({
       to: email,
       subject: "🎁 Here's your personalized result!",
-      html: `<p>Thank you for completing the quiz, ${name || ''}!</p>
-             <p>Your answers indicate you're at the <strong>${awarenessLevel.toUpperCase()}</strong> stage.</p>
-             <p>Click below to discover your personalized solution:</p>
-             <p><a href="https://glowscalepro.com/quiz-results/${quizId}">View My Recommendation</a></p>`
+      html: `
+        <p>Thank you for completing the quiz, ${name || ''}!</p>
+        <p>Your answers indicate you're at the <strong>${awarenessLevel.toUpperCase()}</strong> stage.</p>
+        <p>Click below to discover your personalized solution:</p>
+        <p><a href="https://glowscalepro.com/quiz-results/${quizId}">View My Recommendation</a></p>
+      `
     });
 
     return res.status(200).json({ success: true, message: "Quiz result processed successfully." });
@@ -67,7 +69,7 @@ export async function handleExportLeads(req, res) {
   }
 
   try {
-    const csvData = await exportLeadsByTag(tagId);
+    const csvData = await exportContactsByTag(tagId); // ✅ Nome correto
     res.setHeader('Content-Disposition', `attachment; filename=leads_tag_${tagId}.csv`);
     res.setHeader('Content-Type', 'text/csv');
     res.send(csvData);

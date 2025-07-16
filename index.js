@@ -7,21 +7,21 @@ import morgan from "morgan";
 import { handleResubscribe } from "./controllers/resubscribeController.js";
 import { handleUnsubscribe } from "./controllers/unsubscribeController.js";
 import quizRoutes from "./routes/quizRoutes.js";
-import logRoute from "./routes/logRoute.js"; // ✅ Nova rota de log
+import logRoute from "./routes/logRoute.js";
 import logger from "./utils/logger.js";
 
 dotenv.config();
 const app = express();
 const PORT = process.env.PORT || 10000;
 
-// 🔓 CORS Middleware
+// 🔓 CORS Configuration
 const corsConfig = {
   origin: process.env.FRONTEND_URL,
   credentials: true,
   exposedHeaders: ["set-cookie"]
 };
 
-// 🛡️ CSRF Middleware
+// 🛡️ CSRF Configuration
 const csrfProtection = csrf({
   cookie: {
     httpOnly: true,
@@ -31,47 +31,47 @@ const csrfProtection = csrf({
   }
 });
 
-// ✅ Ordem dos Middlewares
+// ✅ Middlewares em ordem correta
 app.use(cookieParser());
 app.use(cors(corsConfig));
 app.use(express.json());
 app.use(csrfProtection);
 app.use(morgan("dev"));
 
-// 🔥 Log global por request
+// 🔥 Log por request
 app.use((req, res, next) => {
-  logger.info(`🔥 Request recebida: ${req.method} ${req.originalUrl}`);
+  logger.info(`🔥 ${req.method} ${req.originalUrl}`);
   logger.debug("🔍 Origin:", req.get("Origin"));
-  logger.debug("🔐 Header Token:", req.get("x-csrf-token"));
+  logger.debug("🔐 x-csrf-token:", req.get("x-csrf-token"));
   logger.debug("🍪 Cookies:", req.cookies);
   next();
 });
 
-// 🔐 Rota para obter CSRF Token
+// ✅ Endpoint para obter o CSRF Token
 app.get("/api/csrf-token", (req, res) => {
   const token = req.csrfToken();
-  logger.debug("🔐 Generated CSRF Token:", token);
+  logger.debug("🔐 Token CSRF gerado:", token);
   res.json({ csrfToken: token });
 });
 
-// ✅ Rota para descadastro (unsubscribe)
+// ✅ Endpoint para descadastro (unsubscribe)
 app.post("/api/unsubscribe", handleUnsubscribe);
 
-// ✅ Rota para reativar subscrição
+// ✅ Endpoint para reativação de subscrição
 app.post("/api/resubscribe", (req, res, next) => {
-  logger.debug("🧪 BODY recebido:", req.body);
+  logger.debug("🧪 Requisição de resubscribe:", req.body);
   next();
 }, handleResubscribe);
 
-// ✅ Rotas dos quizzes e exportação de leads
+// ✅ Rotas principais (quiz, exportação de leads, etc.)
 app.use("/api", quizRoutes);
 
-// ✅ Nova rota de logging do frontend
+// ✅ Rota para logs frontend
 app.use("/api/log", logRoute);
 
 // ✅ Inicialização do servidor
 app.listen(PORT, () => {
-  logger.info("🚀 Server running on port " + PORT, {
+  logger.info(`🚀 Servidor iniciado na porta ${PORT}`, {
     app: "GlowscalePro",
     version: "1.0.0",
     env: process.env.NODE_ENV

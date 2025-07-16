@@ -1,5 +1,3 @@
-// controllers/resubscribeController.js
-
 import * as ActiveCampaignService from "../services/activeCampaignService.js";
 import tagMappings from "../data/tagMappings.js";
 import logger from "../utils/logger.js";
@@ -27,13 +25,15 @@ export async function handleResubscribe(req, res) {
 
     logger.debug(`📇 Contato localizado`, { contactId, email, listId, productTagId });
 
-    // ✅ Reinscreve o contato na lista mestre (se método disponível)
+    // ✅ Reinscreve o contato na lista mestre (se disponível)
     if (typeof ActiveCampaignService.addContactToList === "function") {
       await ActiveCampaignService.addContactToList(contactId, listId);
       logger.info(`✅ Contato ${email} reinscrito na lista ID ${listId}`);
+    } else {
+      logger.warn(`⚠️ Função 'addContactToList' não está disponível em ActiveCampaignService`);
     }
 
-    // ✅ Reaplica a tag do produto
+    // ✅ Reaplica a tag do produto, se houver
     if (productTagId) {
       await ActiveCampaignService.applyTagToContact(email, productTagId);
       logger.info(`🏷️ Tag de produto ${productTagId} reaplicada ao contato ${email}`);
@@ -42,8 +42,8 @@ export async function handleResubscribe(req, res) {
     }
 
     // ✅ Remove tags de descadastro
-    const { unsubscribeRequested, unsubscribeConfirmed } = tagMappings.specialTags;
-    const tagsParaRemover = [unsubscribeRequested, unsubscribeConfirmed];
+    const { unsubscribeRequested, unsubscribeConfirmed } = tagMappings.specialTags || {};
+    const tagsParaRemover = [unsubscribeRequested, unsubscribeConfirmed].filter(Boolean);
 
     for (const tag of tagsParaRemover) {
       try {

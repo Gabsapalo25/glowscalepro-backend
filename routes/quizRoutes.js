@@ -5,15 +5,17 @@ import { handleExportLeads } from "../controllers/exportController.js";
 
 const router = express.Router();
 
-// Rota para envio de resultado do quiz
+// 🎯 Envio de resultado do quiz
 router.post("/send-result", handleQuizSubmission);
 
-// Rota protegida para exportar leads por tagId (ex: /export-leads/10)
+// 🔐 Exportação protegida de leads via tagId
 router.get("/export-leads/:tagId", (req, res, next) => {
   const token = req.headers["x-admin-token"];
-  if (token !== process.env.ADMIN_EXPORT_TOKEN) {
+
+  if (!token || token !== process.env.ADMIN_EXPORT_TOKEN) {
     return res.status(403).json({ error: "Unauthorized access" });
   }
+
   next();
 }, handleExportLeads);
 
