@@ -1,109 +1,59 @@
-import fs from "fs";
-import path from "path";
-import { fileURLToPath } from "url";
-import { createOrUpdateContact, applyTagToContact } from "../services/activeCampaign.js";
-import { createLogger, format, transports } from "winston";
-
-// Corrigindo __dirname para ES Modules
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-
-// Configuração do logger para produção e desenvolvimento
-const logger = createLogger({
-  level: process.env.NODE_ENV === "production" ? "info" : "debug",
-  format: format.combine(
-    format.timestamp({ format: "YYYY-MM-DD HH:mm:ss" }),
-    format.json(),
-    format.errors({ stack: true }) // Inclui stack trace em erros
-  ),
-  transports: [
-    new transports.Console({
-      format: format.combine(
-        format.colorize(),
-        format.printf(({ timestamp, level, message, ...metadata }) => {
-          const meta = Object.keys(metadata).length ? JSON.stringify(metadata, null, 2) : "";
-          return `[${timestamp}] ${level}: ${message} ${meta}`;
-        })
-      ),
-    }),
-    ...(process.env.NODE_ENV === "production"
-      ? [] // Evita escrita em arquivos no Render
-      : [
-          new transports.File({
-            filename: path.join(__dirname, "../logs/error.log"),
-            level: "error",
-            maxsize: 5242880, // 5MB
-            maxFiles: 5,
-          }),
-          new transports.File({
-            filename: path.join(__dirname, "../logs/combined.log"),
-            maxsize: 5242880,
-            maxFiles: 5,
-          }),
-        ]),
-  ],
-  exceptionHandlers: [
-    new transports.Console(),
-    ...(process.env.NODE_ENV === "production"
-      ? []
-      : [new transports.File({ filename: path.join(__dirname, "../logs/exceptions.log") })]),
-  ],
-  rejectionHandlers: [
-    new transports.Console(),
-    ...(process.env.NODE_ENV === "production"
-      ? []
-      : [new transports.File({ filename: path.join(__dirname, "../logs/rejections.log") })]),
-  ],
-});
-
-// Caminho do arquivo de dados
-const dataPath = path.join(__dirname, "../data/data.json");
-
-// Função principal para lidar com o resultado do quiz
 export const handleQuizResult = async (req, res) => {
   try {
-    const { name, email, tagId } = req.body;
+    const { name, email, quizId, phone, score, total, affiliateLink } = req.body;
 
-    // Validação
-    if (!name || !email || !tagId) {
-      logger.error("Campos obrigatórios ausentes", { name, email, tagId });
-      return res.status(400).json({ error: "Campos obrigatórios ausentes" });
-    }
-    const emailRegex = /^[^\s@]+@[^\s@]+\.([^\s@]{2,})$/;
-    if (!emailRegex.test(email)) {
-      logger.error("Formato de email inválido", { email });
-      return res.status(400).json({ error: "Formato de email inválido" });
+    logger.info("📩 Received quiz result", { name, email, quizId, score });
+
+    const config = quizzesConfig[quizId];
+    if (!config) {
+      return res.status(400).json({ success: false, message: "Invalid quiz ID" });
     }
 
-    logger.info("Processando resultado do quiz", { name, email, tagId });
+    // 1️⃣ ActiveCampaign – Criação/atualização do contato
+    const contact = await createOrUpdateContact({ name, email, phone });
+    logger.info("🧠 ActiveCampaign contact created/updated", contact);
 
-    // Adiciona ou atualiza o contato no ActiveCampaign
-    logger.debug("Criando/atualizando contato no ActiveCampaign", { email, name });
-    const contact = await createOrUpdateContact({ email, name });
-
-    // Aplica a tag ao contato
-    logger.debug("Aplicando tag ao contato", { email, tagId });
-    await applyTagToContact(email, tagId);
-
-    // Salva no data.json local
-    const newLead = { name, email, tagId, date: new Date().toISOString() };
-    let data = [];
-    if (fs.existsSync(dataPath)) {
-      const fileContent = fs.readFileSync(dataPath, "utf-8");
-      data = JSON.parse(fileContent);
+    // 2️⃣ Aplicar tag com base no score
+    const tag = tagMappings[quizId]?.find(t => score >= t.min && score <= t.max);
+    if (tag) {
+      await applyTagToContact(contact.id, tag.tagId);
+      logger.info(`🏷️ Tag "${tag.name}" applied to contact`, { email });
     }
 
-    data.push(newLead);
-    try {
-      fs.writeFileSync(dataPath, JSON.stringify(data, null, 2), "utf-8");
-      logger.info("Lead salvo em data.json", { newLead });
-    } catch (fileError) {
-      logger.warn("Falha ao salvar em data.json", { error: fileError.message });
-    }
+    // 3️⃣ Enviar e-mail com resultado
+    const transporter = nodemailer.createTransport({
+      host: process.env.SMTP_HOST,
+      port: parseInt(process.env.SMTP_PORT),
+      secure: true,
+      auth: {
+        user: process.env.SMTP_USER,
+        pass: process.env.SMTP_PASS
+      }
+    });
 
-    res.status(200).json({ message: "Lead processado com sucesso" });
-  } catch (error) {
-    logger.error("Erro ao processar resultado do quiz", { error: error.message, stack: error.stack });
-    res.status(500).json({ error: "Erro interno do servidor" });
+    const mailOptions = {
+      from: `"${config.senderName}" <${config.senderEmail}>`,
+      to: email,
+      subject: config.emailSubject,
+      html: config.generateEmailHtml({ name, score, total, affiliateLink })
+    };
+
+    await transporter.sendMail(mailOptions);
+    logger.info("📧 Result email sent to contact", { to: email });
+
+    // 4️⃣ Salvar lead localmente (opcional)
+    const lead = { name, email, phone, score, total, quizId, date: new Date().toISOString() };
+    const existingData = fs.existsSync(dataPath)
+      ? JSON.parse(fs.readFileSync(dataPath, "utf-8"))
+      : [];
+    existingData.push(lead);
+    fs.writeFileSync(dataPath, JSON.stringify(existingData, null, 2));
+    logger.info("💾 Lead saved locally", lead);
+
+    // 5️⃣ Retorno de sucesso
+    res.status(200).json({ success: true });
+  } catch (err) {
+    logger.error("❌ Error handling quiz result", err);
+    res.status(500).json({ success: false, message: "Internal server error" });
   }
 };
