@@ -1,3 +1,4 @@
+// controllers/quizController.js
 import { createOrUpdateContact, applyTagToContact } from '../services/activeCampaign.js';
 import { quizzesConfig } from '../config/quizzesConfig.js';
 import tagMappings from '../data/tagMappings.js';
@@ -11,7 +12,6 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const dataPath = path.join(__dirname, '../data/data.json');
 
-// Logger configuration
 const logger = createLogger({
   level: process.env.NODE_ENV === 'production' ? 'info' : 'debug',
   format: format.combine(
@@ -46,12 +46,7 @@ export const handleQuizResult = async (req, res) => {
   try {
     const { name, email, quizId, phone, score, total, affiliateLink } = req.body;
 
-    logger.info('📩 Received quiz result', {
-      name,
-      email,
-      quizId,
-      score
-    });
+    logger.info('📩 Received quiz result', { name, email, quizId, score });
 
     const config = quizzesConfig[quizId];
     if (!config) {
@@ -79,12 +74,12 @@ export const handleQuizResult = async (req, res) => {
       }
     }
 
-    // 3️⃣ Enviar e-mail com resultado
+    // 3️⃣ Enviar e-mails: participante e admin
     try {
       const transporter = nodemailer.createTransport({
         host: process.env.SMTP_HOST,
         port: parseInt(process.env.SMTP_PORT),
-        secure: false, // STARTTLS para porta 587
+        secure: process.env.SMTP_SECURE === 'true',
         auth: {
           user: process.env.SMTP_USER,
           pass: process.env.SMTP_PASS
@@ -94,20 +89,37 @@ export const handleQuizResult = async (req, res) => {
         }
       });
 
-      const mailOptions = {
+      // Enviar para participante
+      await transporter.sendMail({
         from: `"GlowscalePro" <${process.env.SMTP_USER}>`,
         to: email,
         subject: config.subject,
         html: config.generateEmailHtml({ name, score, total, affiliateLink })
-      };
-
-      await transporter.sendMail(mailOptions);
+      });
       logger.info('📧 Result email sent to contact', { to: email });
+
+      // Enviar para admin
+      await transporter.sendMail({
+        from: `"GlowscalePro" <${process.env.SMTP_USER}>`,
+        to: process.env.ADMIN_EMAIL,
+        subject: `📥 New Quiz Submission (${quizId})`,
+        html: `
+          <h3>New Quiz Submission Received</h3>
+          <p><strong>Name:</strong> ${name}</p>
+          <p><strong>Email:</strong> ${email}</p>
+          <p><strong>Phone:</strong> ${phone || '-'}</p>
+          <p><strong>Score:</strong> ${score}/${total}</p>
+          <p><strong>Quiz:</strong> ${quizId}</p>
+          <p><strong>Date:</strong> ${new Date().toLocaleString()}</p>
+        `
+      });
+      logger.info('📧 Notification email sent to admin', { to: process.env.ADMIN_EMAIL });
+
     } catch (error) {
       logger.error(`❌ Email sending error: ${error.message}`);
     }
 
-    // 4️⃣ Salvar localmente (data.json)
+    // 4️⃣ Salvar localmente
     const lead = {
       name,
       email,
@@ -129,7 +141,6 @@ export const handleQuizResult = async (req, res) => {
       logger.warn(`⚠️ Failed to save lead locally: ${error.message}`);
     }
 
-    // 5️⃣ Sucesso
     res.status(200).json({ success: true });
   } catch (err) {
     logger.error(`❌ Error handling quiz result: ${err.message}`);
