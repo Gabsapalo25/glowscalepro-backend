@@ -1,73 +1,75 @@
-import axios from "axios";
-import { ACTIVE_CAMPAIGN_API_KEY, ACTIVE_CAMPAIGN_BASE_URL } from "../config.js";
+// services/activeCampaign.js
+import axios from 'axios';
+import dotenv from 'dotenv';
 
-const headers = {
-  "Api-Token": ACTIVE_CAMPAIGN_API_KEY,
-  "Content-Type": "application/json",
-};
+dotenv.config();
+
+const ACTIVE_CAMPAIGN_API_KEY = process.env.ACTIVE_CAMPAIGN_API_KEY;
+const ACTIVE_CAMPAIGN_API_URL = process.env.ACTIVE_CAMPAIGN_API_URL;
 
 const api = axios.create({
-  baseURL: `${ACTIVE_CAMPAIGN_BASE_URL}/api/3`,
-  headers,
+  baseURL: `${ACTIVE_CAMPAIGN_API_URL}/api/3`,
+  headers: {
+    'Api-Token': ACTIVE_CAMPAIGN_API_KEY,
+    'Content-Type': 'application/json'
+  }
 });
 
-// Cria ou atualiza um contato
-export async function createOrUpdateContact({ email, name, customFields = {} }) {
+/**
+ * Cria ou atualiza um contato no ActiveCampaign.
+ * @param {Object} contactData
+ * @param {string} contactData.name
+ * @param {string} contactData.email
+ * @param {string} [contactData.phone]
+ */
+export async function createOrUpdateContact({ name, email, phone }) {
   try {
-    const response = await api.post("/contact/sync", {
+    const response = await api.post('/contact/sync', {
       contact: {
         email,
         firstName: name,
-        fieldValues: Object.entries(customFields).map(([fieldId, fieldValue]) => ({
-          field: fieldId,
-          value: fieldValue,
-        })),
-      },
+        phone
+      }
     });
 
     return response.data.contact;
   } catch (error) {
-    console.error("Erro ao criar/atualizar contato no ActiveCampaign:", error.response?.data || error.message);
-    throw error;
-  }
-}
+    const status = error.response?.status;
+    const details = error.response?.data;
 
-// Aplica uma TAG a um contato via e-mail
-export async function applyTagToContact(email, tagId) {
-  try {
-    const contactId = await getContactIdByEmail(email);
-    if (!contactId) throw new Error(`Contato não encontrado: ${email}`);
-
-    await api.post("/contactTags", {
-      contactTag: {
-        contact: contactId,
-        tag: tagId,
-      },
+    console.error('❌ ActiveCampaign contact error:', {
+      status,
+      details
     });
 
-    return true;
-  } catch (error) {
-    console.error(`Erro ao aplicar TAG ${tagId} ao contato ${email}:`, error.response?.data || error.message);
-    throw error;
+    throw new Error(`ActiveCampaign contact creation failed with status ${status}`);
   }
 }
 
-// Obtém o ID do contato com base no e-mail
-export async function getContactIdByEmail(email) {
+/**
+ * Aplica uma tag a um contato no ActiveCampaign.
+ * @param {number|string} contactId
+ * @param {number|string} tagId
+ */
+export async function applyTagToContact(contactId, tagId) {
   try {
-    const response = await api.get(`/contacts?email=${email}`);
-    const contacts = response.data.contacts;
-
-    return contacts.length > 0 ? contacts[0].id : null;
+    await api.post('/contactTags', {
+      contactTag: {
+        contact: contactId,
+        tag: tagId
+      }
+    });
   } catch (error) {
-    console.error("Erro ao buscar contato por email:", error.response?.data || error.message);
-    throw error;
-  }
-}
+    const status = error.response?.status;
+    const details = error.response?.data;
 
-// Aplica múltiplas tags
-export async function applyMultipleTagsToContact(email, tagIds = []) {
-  for (const tagId of tagIds) {
-    await applyTagToContact(email, tagId);
+    console.warn('⚠️ Failed to apply tag to contact:', {
+      contactId,
+      tagId,
+      status,
+      details
+    });
+
+    throw new Error(`Failed to apply tag with status ${status}`);
   }
 }
