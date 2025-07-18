@@ -25,9 +25,9 @@ const tagMappings = {
 
   // 🔗 Nível de consciência → ID da tag correspondente
   awarenessLevelToTagId: {
-    cold: 17, // GlowscalePro_Level1
-    warm: 18, // GlowscalePro_Level2
-    hot: 19   // GlowscalePro_Level3
+    cold: 17,
+    warm: 18,
+    hot: 19
   },
 
   // 🔗 Nível de consciência → Nome amigável
@@ -54,10 +54,24 @@ const tagMappings = {
       name: "descadastro-solicitado"
     },
     unsubscribeConfirmed: {
-      id: 20, // Tag manualmente mapeada
+      id: 20,
       name: "descadastro confirmado"
     }
   }
 };
+
+// 🏷️ Gerar mapeamentos de score dinâmicos por quizId
+tagMappings.scoreTagsByQuiz = {};
+
+for (const quizId of Object.keys(tagMappings.quizIdToTagId)) {
+  tagMappings.scoreTagsByQuiz[quizId] = Object.entries(tagMappings.scoreToAwarenessLevel).map(
+    ([level, range]) => ({
+      name: tagMappings.awarenessLevelToTagName[level],
+      tagId: tagMappings.awarenessLevelToTagId[level],
+      min: range.min,
+      max: range.max
+    })
+  );
+}
 
 export default tagMappings;
