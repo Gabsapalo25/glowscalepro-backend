@@ -12,45 +12,46 @@ function baseEmailTemplate({
   introText,
   bullets = [],
   affiliateLink,
-  ctaText
+  ctaText,
+  ebookUrl
 }) {
   const bulletsHtml = bullets.map(bullet => `<li>${bullet}</li>`).join("");
   const unsubscribeUrl = `https://glowscalepro-2.funnels.mastertools.com/unsubscribe?email=${encodeURIComponent(email)}`;
 
   return `
     <div style="font-family:Segoe UI,Roboto,Helvetica,Arial,sans-serif;max-width:600px;margin:auto;">
-      <!-- Header com logo -->
       <div style="background-color:#1e3a8a;padding:24px 0;text-align:center;">
         <img src="${LOGO_URL}" alt="GlowscalePro Logo" style="max-width:220px;">
       </div>
 
-      <!-- Título do produto -->
       <h2 style="color:${headingColor};text-align:center;margin-bottom:12px;">${productName} Quiz</h2>
-
-      <!-- Saudação -->
       <p style="margin:0 0 14px;">Hello, ${name}!</p>
 
-      <!-- Resultado do quiz -->
       <p style="font-size:18px;font-weight:bold;margin:0 0 18px;">
         ${score}/${total}
         <br>
         <span style="font-size:15px;font-weight:400;">Your Final Score</span>
       </p>
 
-      <!-- Introdução -->
       <p style="margin:0 0 20px;">${introText}</p>
 
-      <!-- Lista de benefícios -->
       <ul style="padding-left:20px;margin:0 0 28px;">${bulletsHtml}</ul>
 
-      <!-- Botão de CTA -->
+      ${ebookUrl ? `
+        <div style="text-align:center;margin:24px 0;">
+          <p style="font-size:16px;">🎁 Download your free eBook:</p>
+          <a href="${ebookUrl}" target="_blank" style="display:inline-block;margin-top:8px;background:#2ecc71;color:#fff;padding:10px 20px;border-radius:5px;text-decoration:none;">
+            Download eBook
+          </a>
+        </div>
+      ` : ""}
+
       <div style="text-align:center;margin:32px 0;">
         <a href="${affiliateLink}" aria-label="Call to action: ${ctaText}" style="background:${headingColor};color:#ffffff;padding:14px 32px;border-radius:6px;text-decoration:none;font-weight:600;display:inline-block;">
           ${ctaText}
         </a>
       </div>
 
-      <!-- Rodapé -->
       <p style="text-align:center;font-size:12px;color:#888;line-height:1.6;">
         Want to stop receiving these emails?<br>
         <a href="${unsubscribeUrl}" style="color:#e74c3c;text-decoration:underline;" target="_blank" rel="noopener noreferrer">Unsubscribe</a> |
@@ -70,14 +71,21 @@ function tokmate({ name, email, score, total, affiliateLink }) {
     email,
     score,
     total,
-    introText: "You're closer than ever to unlocking viral growth on TikTok. Based on your answers, we believe you're ready to take the next step.",
+    introText: `
+      Hi ${name?.split(" ")[0] || "there"},<br><br>
+      Congratulations on completing the TokMate Quiz! You scored <strong>${score}/${total}</strong> — an outstanding result.<br><br>
+      Your answers reveal you're highly aligned with what it takes to grow on TikTok.
+      That’s why we’ve tailored a powerful recommendation to match your stage — and as a bonus, you now have access to our exclusive guide: <strong>"TikTok In Veins 2025"</strong>.
+      It’s packed with practical strategies for explosive growth.
+    `,
     bullets: [
-      "Boost your TikTok growth intelligently",
-      "AI‑driven content ideas",
-      "Monetization made easier"
+      "Uncover AI-driven content strategies tailored to your niche",
+      "Turn your views into real monetization opportunities",
+      "Grow consistently using the newest viral trends"
     ],
     affiliateLink,
-    ctaText: "Start Growing on TikTok"
+    ctaText: "See Your Personalized Growth Plan",
+    ebookUrl: "https://drive.google.com/file/d/1Eyjxmx_zhiMH9tk8ia0tnaPGLwu4ApV2/view?usp=drive_link"
   });
 }
 
@@ -89,7 +97,10 @@ function nervovive({ name, email, score, total, affiliateLink }) {
     email,
     score,
     total,
-    introText: `Your nerves deserve relief — and your quiz score of ${score}/${total} shows you're ready.`,
+    introText: `
+      Your score of ${score}/${total} suggests your nervous system may need support.<br><br>
+      Discover how NervoVive can help soothe discomfort and promote balance from the inside out.
+    `,
     bullets: [
       "Soothe burning or tingling sensations",
       "Support nerve regeneration",
@@ -109,7 +120,10 @@ function primebiome({ name, email, score, total, affiliateLink }) {
     email,
     score,
     total,
-    introText: `Your gut health matters — and with a score of ${score}/${total}, it's clear you're on the right track.`,
+    introText: `
+      A score of ${score}/${total} means your gut health is ready for a reset.<br><br>
+      PrimeBiome offers natural, research-backed solutions to restore your microbiome and energize your life.
+    `,
     bullets: [
       "Balance your microbiome naturally",
       "Support digestion and immune function",
@@ -129,7 +143,10 @@ function prodentim({ name, email, score, total, affiliateLink }) {
     email,
     score,
     total,
-    introText: "Great score! Your oral health journey starts here — ProDentim is packed with probiotics to help.",
+    introText: `
+      Your results show you're ready to invest in better oral health.<br><br>
+      ProDentim delivers proven probiotic power to protect and restore your smile.
+    `,
     bullets: [
       "Strengthen gums and teeth",
       "Fight bad breath at the root",
@@ -149,7 +166,10 @@ function glucoshield({ name, email, score, total, affiliateLink }) {
     email,
     score,
     total,
-    introText: "You're informed — now protect your body with GlucoShield Pro.",
+    introText: `
+      Based on your score of ${score}/${total}, it's time to take charge of your blood sugar health.<br><br>
+      GlucoShield Pro provides powerful daily support to help you stay in control naturally.
+    `,
     bullets: [
       "Stabilize blood sugar safely",
       "Protect cells from oxidative stress",
@@ -169,7 +189,10 @@ function prostadine({ name, email, score, total, affiliateLink }) {
     email,
     score,
     total,
-    introText: `Your result (${score}/${total}) shows you care about men's health — Prostadine can make a real difference.`,
+    introText: `
+      Your quiz score of ${score}/${total} indicates concern for prostate wellness — and you're not alone.<br><br>
+      Prostadine can support healthy function, ease discomfort, and restore daily confidence.
+    `,
     bullets: [
       "Support healthy prostate function",
       "Reduce urgency & frequency",
@@ -189,7 +212,10 @@ function totalcontrol24({ name, email, score, total, affiliateLink }) {
     email,
     score,
     total,
-    introText: "Great score! You're serious about your health — Total Control 24 is your next step.",
+    introText: `
+      Your score shows you're motivated to take control of your blood sugar and energy levels.<br><br>
+      TotalControl24 empowers your body with consistent support throughout the day.
+    `,
     bullets: [
       "Balance blood sugar naturally",
       "Improve insulin response",
@@ -200,8 +226,6 @@ function totalcontrol24({ name, email, score, total, affiliateLink }) {
     ctaText: "Control Blood Sugar Now"
   });
 }
-
-// ========== EXPORTAÇÃO FINAL ==========
 
 export const templates = {
   tokmate,
