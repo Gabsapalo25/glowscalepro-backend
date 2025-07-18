@@ -63,7 +63,7 @@ export const handleQuizResult = async (req, res) => {
       return res.status(500).json({ success: false, message: 'ActiveCampaign error' });
     }
 
-    // 2️⃣ Determine awareness level and tag
+    // 2️⃣ Apply awareness tag based on score
     let appliedTag = null;
     for (const [level, range] of Object.entries(tagMappings.scoreToAwarenessLevel)) {
       if (score >= range.min && score <= range.max) {
@@ -71,13 +71,26 @@ export const handleQuizResult = async (req, res) => {
         const tagName = tagMappings.awarenessLevelToTagName[level];
         try {
           await applyTagToContact(contact.id, tagId);
-          logger.info(`🏷️ Tag "${tagName}" (ID: ${tagId}) applied to contact: ${email}`);
+          logger.info(`🏷️ Awareness tag "${tagName}" (ID: ${tagId}) applied to: ${email}`);
           appliedTag = { level, tagId, tagName };
         } catch (error) {
-          logger.warn(`⚠️ Failed to apply tag: ${error.message}`);
+          logger.warn(`⚠️ Failed to apply awareness tag: ${error.message}`);
         }
         break;
       }
+    }
+
+    // 2️⃣b Apply product tag based on quizId
+    try {
+      const productTagId = tagMappings.quizIdToTagId[quizId];
+      if (productTagId) {
+        await applyTagToContact(contact.id, productTagId);
+        logger.info(`🏷️ Product tag (ID: ${productTagId}) applied for quiz "${quizId}" to: ${email}`);
+      } else {
+        logger.warn(`⚠️ No product tag found for quiz ID: ${quizId}`);
+      }
+    } catch (error) {
+      logger.warn(`⚠️ Failed to apply product tag: ${error.message}`);
     }
 
     // 3️⃣ Send quiz result email to participant
@@ -142,7 +155,8 @@ export const handleQuizResult = async (req, res) => {
       total,
       quizId,
       awarenessLevel: appliedTag?.level || 'unknown',
-      tagId: appliedTag?.tagId || null,
+      awarenessTagId: appliedTag?.tagId || null,
+      productTagId: tagMappings.quizIdToTagId[quizId] || null,
       date: new Date().toISOString()
     };
 
