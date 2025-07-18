@@ -1,4 +1,3 @@
-// controllers/quizController.js
 import { createOrUpdateContact, applyTagToContact } from '../services/activeCampaign.js';
 import { quizzesConfig } from '../config/quizzesConfig.js';
 import tagMappings from '../data/tagMappings.js';
@@ -85,10 +84,13 @@ export const handleQuizResult = async (req, res) => {
       const transporter = nodemailer.createTransport({
         host: process.env.SMTP_HOST,
         port: parseInt(process.env.SMTP_PORT),
-        secure: true,
+        secure: false, // STARTTLS para porta 587
         auth: {
           user: process.env.SMTP_USER,
           pass: process.env.SMTP_PASS
+        },
+        tls: {
+          rejectUnauthorized: process.env.SMTP_TLS_REJECT_UNAUTHORIZED === 'true'
         }
       });
 
