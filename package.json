@@ -21,6 +21,7 @@
     "winston": "^3.17.0"
   },
   "devDependencies": {
-    "nodemon": "^3.1.0"
+    "nodemon": "^3.1.0",
+    "pino-pretty": "^13.0.0"
   }
 }

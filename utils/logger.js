@@ -5,7 +5,7 @@ const isProd = process.env.NODE_ENV === 'production';
 const logger = pino({
   level: isProd ? 'info' : 'debug',
   ...(isProd
-    ? {} // Sem transport em produção (deixa o Render capturar via stdout)
+    ? {} // Produção: JSON para Render capturar
     : {
         transport: {
           target: 'pino-pretty',
@@ -15,8 +15,7 @@ const logger = pino({
             ignore: 'pid,hostname'
           }
         }
-      }
-  ),
+      }),
   base: {
     app: 'GlowscalePro',
     version: '1.0.0',
