@@ -1,3 +1,7 @@
+// services/templates/templates.js
+
+import { quizzesConfig } from "../../config/quizzesConfig.js";
+
 const LOGO_URL = "https://content.app-sources.com/s/406737170044669131/uploads/Images/1-removebg-preview-3444739.png";
 
 function baseEmailTemplate({
@@ -62,6 +66,8 @@ function baseEmailTemplate({
 // ========== TEMPLATES POR PRODUTO ==========
 
 function tokmate({ name, email, score, total, affiliateLink }) {
+  const { ebookUrl } = quizzesConfig.tokmate;
+
   return baseEmailTemplate({
     productName: "TokMate",
     headingColor: "#f59e0b",
@@ -73,7 +79,7 @@ function tokmate({ name, email, score, total, affiliateLink }) {
       Hi ${name?.split(" ")[0] || "there"},<br><br>
       Congratulations on completing the TokMate Quiz! You scored <strong>${score}/${total}</strong> — an outstanding result.<br><br>
       Your answers reveal you're highly aligned with what it takes to grow on TikTok.
-      That’s why we’ve tailored a powerful recommendation to match your stage — and as a bonus, you now have access to our exclusive guide: <strong>"TikTok In Veins 2025"</strong>.
+      That’s why we’ve tailored a powerful recommendation to match your stage — and as a bonus, you now have access to our exclusive guide: <strong>"TikTok In Veins 2025"</strong>.<br>
       It’s packed with practical strategies for explosive growth.
     `,
     bullets: [
@@ -83,7 +89,7 @@ function tokmate({ name, email, score, total, affiliateLink }) {
     ],
     affiliateLink,
     ctaText: "See Your Personalized Growth Plan",
-    ebookUrl: "https://drive.google.com/file/d/1Eyjxmx_zhiMH9tk8ia0tnaPGLwu4ApV2/view?usp=drive_link"
+    ebookUrl
   });
 }
 
