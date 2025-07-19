@@ -44,10 +44,10 @@ const tagMappings = {
     hot:  { min: 9, max: 12 }
   },
 
-  // 📋 Lista única de leads (consistente com o .env)
+  // 📋 Lista única de leads (deve bater com a variável no .env)
   MASTER_LIST_ID: parseInt(process.env.MASTER_LIST_ID || "5"),
 
-  // 🚫 Tags especiais usadas para descadastro
+  // 🚫 Tags especiais usadas para descadastro e controle
   specialTags: {
     unsubscribeRequested: {
       id: parseInt(process.env.UNSUBSCRIBE_TAG_ID || "16"),
@@ -60,7 +60,7 @@ const tagMappings = {
   }
 };
 
-// 🏷️ Gerar mapeamentos de score dinâmicos por quizId
+// 🏷️ Gerar mapeamentos de score dinâmicos por quizId (auto-indexado)
 tagMappings.scoreTagsByQuiz = {};
 
 for (const quizId of Object.keys(tagMappings.quizIdToTagId)) {
