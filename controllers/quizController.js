@@ -1,6 +1,7 @@
 import { createOrUpdateContact, applyTagToContact } from '../services/activeCampaign.js';
 import { quizzesConfig } from '../config/quizzesConfig.js';
 import tagMappings from '../data/tagMappings.js';
+import { templates } from '../services/templates/templates.js';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -93,7 +94,7 @@ export const handleQuizResult = async (req, res) => {
       logger.warn(`⚠️ Failed to apply product tag: ${error.message}`);
     }
 
-    // 3️⃣ Send quiz result email to participant
+    // 3️⃣ Send quiz result email to participant (usando TEMPLATE AVANÇADO)
     const transporter = nodemailer.createTransport({
       host: process.env.SMTP_HOST,
       port: parseInt(process.env.SMTP_PORT),
@@ -111,7 +112,13 @@ export const handleQuizResult = async (req, res) => {
       from: `"GlowscalePro" <${process.env.SMTP_USER}>`,
       to: email,
       subject: config.subject,
-      html: config.generateEmailHtml({ name, score, total, affiliateLink })
+      html: templates[quizId]?.({
+        name,
+        email,
+        score,
+        total,
+        affiliateLink
+      }) || config.generateEmailHtml({ name, score, total, affiliateLink }) // fallback
     };
 
     try {
