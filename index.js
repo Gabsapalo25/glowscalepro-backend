@@ -14,14 +14,14 @@ dotenv.config();
 const app = express();
 const PORT = process.env.PORT || 10000;
 
-// 🔓 CORS Configuration
+// ✅ CORS Configuration
 const corsConfig = {
-  origin: process.env.FRONTEND_URL,
+  origin: process.env.FRONTEND_URL || "https://glowscalepro.com",
   credentials: true,
   exposedHeaders: ["set-cookie"]
 };
 
-// 🛡️ CSRF Configuration
+// ✅ CSRF Protection Configuration
 const csrfProtection = csrf({
   cookie: {
     httpOnly: true,
@@ -31,14 +31,14 @@ const csrfProtection = csrf({
   }
 });
 
-// ✅ Middlewares em ordem correta
+// ✅ Middlewares
 app.use(cookieParser());
 app.use(cors(corsConfig));
 app.use(express.json());
 app.use(csrfProtection);
 app.use(morgan("dev"));
 
-// 🔥 Log por request
+// ✅ Logging por requisição
 app.use((req, res, next) => {
   logger.info(`🔥 ${req.method} ${req.originalUrl}`);
   logger.debug("🔍 Origin:", req.get("Origin"));
@@ -47,23 +47,23 @@ app.use((req, res, next) => {
   next();
 });
 
-// ✅ Endpoint para obter o CSRF Token
+// ✅ Endpoint para obter o token CSRF
 app.get("/api/csrf-token", (req, res) => {
   const token = req.csrfToken();
   logger.debug("🔐 Token CSRF gerado:", token);
   res.json({ csrfToken: token });
 });
 
-// ✅ Endpoint para descadastro (unsubscribe)
+// ✅ Descadastro
 app.post("/api/unsubscribe", handleUnsubscribe);
 
-// ✅ Endpoint para reativação de subscrição
+// ✅ Reinscrição
 app.post("/api/resubscribe", (req, res, next) => {
   logger.debug("🧪 Requisição de resubscribe:", req.body);
   next();
 }, handleResubscribe);
 
-// ✅ Rotas principais (quiz, exportação de leads, etc.)
+// ✅ Rotas principais (quiz, leads)
 app.use("/api", quizRoutes);
 
 // ✅ Rota para logs frontend
