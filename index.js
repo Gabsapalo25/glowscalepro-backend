@@ -61,6 +61,12 @@ app.get("/api/csrf-token", (req, res) => {
   res.json({ csrfToken: token });
 });
 
+// ✅ Endpoint de Health Check (novo)
+app.get('/health', (req, res) => {
+  logger.info("🩺 Health check solicitado", { frontendUrl: process.env.FRONTEND_URL });
+  res.status(200).json({ status: 'ok', frontendUrl: process.env.FRONTEND_URL });
+});
+
 // ✅ Descadastro
 app.post("/api/unsubscribe", handleUnsubscribe);
 
