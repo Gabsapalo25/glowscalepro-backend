@@ -88,7 +88,33 @@ function tokmate({ name, email, score, total, affiliateLink }) {
     ],
     affiliateLink,
     ctaText: "See Your Personalized Growth Plan",
-    ebookUrl
+    ebookUrl // ✅ incluído
+  });
+}
+
+function primebiome({ name, email, score, total, affiliateLink }) {
+  const { ebookUrl } = quizzesConfig.primebiome;
+
+  return baseEmailTemplate({
+    productName: "PrimeBiome",
+    headingColor: "#27ae60",
+    name,
+    email,
+    score,
+    total,
+    introText: `
+      A score of ${score}/${total} means your gut health is ready for a reset.<br><br>
+      PrimeBiome offers natural, research-backed solutions to restore your microbiome and energize your life.
+    `,
+    bullets: [
+      "Balance your microbiome naturally",
+      "Support digestion and immune function",
+      "Feel energized and lighter",
+      "Eliminate bloating and discomfort"
+    ],
+    affiliateLink,
+    ctaText: "Restore Your Gut Health",
+    ebookUrl // ✅ incluído
   });
 }
 
@@ -112,29 +138,6 @@ function nervovive({ name, email, score, total, affiliateLink }) {
     ],
     affiliateLink,
     ctaText: "Soothe Nerve Discomfort"
-  });
-}
-
-function primebiome({ name, email, score, total, affiliateLink }) {
-  return baseEmailTemplate({
-    productName: "PrimeBiome",
-    headingColor: "#27ae60",
-    name,
-    email,
-    score,
-    total,
-    introText: `
-      A score of ${score}/${total} means your gut health is ready for a reset.<br><br>
-      PrimeBiome offers natural, research-backed solutions to restore your microbiome and energize your life.
-    `,
-    bullets: [
-      "Balance your microbiome naturally",
-      "Support digestion and immune function",
-      "Feel energized and lighter",
-      "Eliminate bloating and discomfort"
-    ],
-    affiliateLink,
-    ctaText: "Restore Your Gut Health"
   });
 }
 

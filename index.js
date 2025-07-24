@@ -36,20 +36,20 @@ app.use(csrfProtection);
 
 // ✅ Middlewares
 app.use(express.json());
-app.use(morgan("dev"));
+if (process.env.NODE_ENV !== "production") app.use(morgan("dev"));
 
-// ✅ Logging Middleware Organizado
+// ✅ Logging Middleware Otimizado para Tempo Real
 app.use((req, res, next) => {
-  const logData = {
-    method: req.method,
-    url: req.originalUrl,
-    origin: req.get("Origin"),
-    csrfToken: req.get("x-csrf-token"),
-    cookies: req.cookies,
-  };
-  logger.info(`🔥 ${req.method} ${req.originalUrl}`, logData);
+  if (req.method === "POST" && req.originalUrl === "/api/send-result") {
+    const logData = {
+      method: req.method,
+      url: req.originalUrl,
+      origin: req.get("Origin"),
+    };
+    logger.info(`🔥 ${req.method} ${req.originalUrl}`, logData);
+  }
   if (process.env.NODE_ENV === "development") {
-    logger.debug("🔍 Detalhes da requisição:", logData);
+    logger.debug("🔍 Detalhes da requisição:", { method: req.method, url: req.originalUrl });
   }
   next();
 });
