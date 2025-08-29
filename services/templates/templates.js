@@ -1,9 +1,6 @@
-// services/templates/templates.js
-import { quizzesConfig } from "../../config/quizzesConfig.js";
-
 const LOGO_URL = "https://content.app-sources.com/s/406737170044669131/uploads/Images/1-removebg-preview-3444739.png";
 
-function baseEmailTemplate({
+const baseEmailTemplate = ({
   productName,
   headingColor,
   name,
@@ -14,8 +11,9 @@ function baseEmailTemplate({
   bullets = [],
   affiliateLink,
   ctaText,
-  ebookUrl
-}) {
+  ebookUrl,
+  extraContent = ""
+}) => {
   const bulletsHtml = bullets.map(bullet => `<li>${bullet}</li>`).join("");
   const unsubscribeUrl = `https://glowscalepro-2.funnels.mastertools.com/unsubscribe?email=${encodeURIComponent(email)}`;
 
@@ -47,6 +45,8 @@ function baseEmailTemplate({
         </div>
       ` : ""}
 
+      ${extraContent}
+
       <div style="text-align:center;margin:32px 0;">
         <a href="${affiliateLink}" aria-label="Call to action: ${ctaText}" style="background:${headingColor};color:#ffffff;padding:14px 32px;border-radius:6px;text-decoration:none;font-weight:600;display:inline-block;">
           ${ctaText}
@@ -60,11 +60,11 @@ function baseEmailTemplate({
         &copy; 2025 GlowscalePro. All rights reserved.
       </p>
     </div>`;
-}
+};
 
 // ========== TEMPLATES POR PRODUTO ==========
 
-function tokmate({ name, email, score, total, affiliateLink }) {
+const tokmate = ({ name, email, score, total, affiliateLink }) => {
   const { ebookUrl } = quizzesConfig.tokmate;
 
   return baseEmailTemplate({
@@ -90,10 +90,10 @@ function tokmate({ name, email, score, total, affiliateLink }) {
     ctaText: "See Your Personalized Growth Plan",
     ebookUrl // ✅ incluído
   });
-}
+};
 
-function primebiome({ name, email, score, total, affiliateLink }) {
-  const { ebookUrl } = quizzesConfig.primebiome;
+const primebiome = ({ name, email, score, total, affiliateLink }) => {
+  const { ebookUrl, ebookUrl2 } = quizzesConfig.primebiome;
 
   return baseEmailTemplate({
     productName: "PrimeBiome",
@@ -104,21 +104,28 @@ function primebiome({ name, email, score, total, affiliateLink }) {
     total,
     introText: `
       A score of ${score}/${total} means your gut health is ready for a reset.<br><br>
-      PrimeBiome offers natural, research-backed solutions to restore your microbiome and energize your life.
+      Thank you for completing the PrimeBiome Quiz! As a thank you, here are two FREE guides to kickstart your journey.
     `,
     bullets: [
-      "Balance your microbiome naturally",
+      "Balance your microbiome naturally with PrimeBiome",
       "Support digestion and immune function",
       "Feel energized and lighter",
       "Eliminate bloating and discomfort"
     ],
     affiliateLink,
-    ctaText: "Restore Your Gut Health",
-    ebookUrl // ✅ incluído
+    ctaText: "Get Your PrimeBiome Solution",
+    ebookUrl: `${ebookUrl}`, // Your Main Guide
+    extraContent: `
+      <div style="text-align:center;margin:24px 0;">
+        <p style="font-size:16px;">🎁 Download your free guides:</p>
+        <a href="${ebookUrl}" target="_blank" style="display:inline-block;margin-top:8px;background:#2ecc71;color:#fff;padding:10px 20px;border-radius:5px;text-decoration:none;">Download Your Main Guide</a><br>
+        <a href="${ebookUrl2}" target="_blank" style="display:inline-block;margin-top:8px;background:#2ecc71;color:#fff;padding:10px 20px;border-radius:5px;text-decoration:none;">Download Skin Vitality Checklist</a>
+      </div>
+    `
   });
-}
+};
 
-function nervovive({ name, email, score, total, affiliateLink }) {
+const nervovive = ({ name, email, score, total, affiliateLink }) => {
   return baseEmailTemplate({
     productName: "NervoVive",
     headingColor: "#9b59b6",
@@ -139,9 +146,9 @@ function nervovive({ name, email, score, total, affiliateLink }) {
     affiliateLink,
     ctaText: "Soothe Nerve Discomfort"
   });
-}
+};
 
-function prodentim({ name, email, score, total, affiliateLink }) {
+const prodentim = ({ name, email, score, total, affiliateLink }) => {
   return baseEmailTemplate({
     productName: "ProDentim",
     headingColor: "#3498db",
@@ -162,9 +169,9 @@ function prodentim({ name, email, score, total, affiliateLink }) {
     affiliateLink,
     ctaText: "Improve Oral Health"
   });
-}
+};
 
-function glucoshield({ name, email, score, total, affiliateLink }) {
+const glucoshield = ({ name, email, score, total, affiliateLink }) => {
   return baseEmailTemplate({
     productName: "GlucoShield Pro",
     headingColor: "#16a085",
@@ -185,9 +192,9 @@ function glucoshield({ name, email, score, total, affiliateLink }) {
     affiliateLink,
     ctaText: "Stabilize Glucose Levels"
   });
-}
+};
 
-function prostadine({ name, email, score, total, affiliateLink }) {
+const prostadine = ({ name, email, score, total, affiliateLink }) => {
   return baseEmailTemplate({
     productName: "Prostadine",
     headingColor: "#c0392b",
@@ -208,9 +215,9 @@ function prostadine({ name, email, score, total, affiliateLink }) {
     affiliateLink,
     ctaText: "Protect Prostate Health"
   });
-}
+};
 
-function totalcontrol24({ name, email, score, total, affiliateLink }) {
+const totalcontrol24 = ({ name, email, score, total, affiliateLink }) => {
   return baseEmailTemplate({
     productName: "TotalControl24",
     headingColor: "#e67e22",
@@ -231,12 +238,12 @@ function totalcontrol24({ name, email, score, total, affiliateLink }) {
     affiliateLink,
     ctaText: "Control Blood Sugar Now"
   });
-}
+};
 
 export const templates = {
   tokmate,
-  nervovive,
   primebiome,
+  nervovive,
   prodentim,
   glucoshield,
   prostadine,
