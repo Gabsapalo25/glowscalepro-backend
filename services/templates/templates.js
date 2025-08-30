@@ -1,3 +1,6 @@
+// services/templates/templates.js
+import { quizzesConfig } from "../../config/quizzesConfig.js"; // Adicionada importação corrigida
+
 const LOGO_URL = "https://content.app-sources.com/s/406737170044669131/uploads/Images/1-removebg-preview-3444739.png";
 
 const baseEmailTemplate = ({
