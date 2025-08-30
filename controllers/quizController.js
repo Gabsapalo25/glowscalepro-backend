@@ -2,7 +2,7 @@
 import express from 'express';
 import nodemailer from 'nodemailer';
 import logger from '../utils/logger.js';
-import { quizzesConfig } from '../../config/quizzesConfig.js'; // Importação corrigida
+import { quizzesConfig } from '../config/quizzesConfig.js'; // Caminho corrigido para ../config/quizzesConfig.js
 
 const router = express.Router();
 
@@ -52,7 +52,6 @@ export const handleQuizResult = async (req, res) => {
 export const applyTags = (email, quizId) => {
   logger.info('🏷️ Tag de awareness "GlowscalePro_level3" (ID: 19) aplicada', { email });
   logger.info('🏷️ Tag de produto (ID: 11) aplicada', { email, quizId });
-  // Lógica real de integração com CRM pode ser adicionada aqui se necessário
 };
 
 router.post('/send-result', async (req, res) => {
