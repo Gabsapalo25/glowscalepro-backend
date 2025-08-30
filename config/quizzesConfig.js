@@ -1,3 +1,4 @@
+// config/quizzesConfig.js
 import { templates } from "../services/templates/templates.js";
 
 export const quizzesConfig = {
@@ -14,7 +15,7 @@ export const quizzesConfig = {
     ctaColor: "#10b981",
     ctaText: "Discover Your Gut Health Solution",
     subject: "Your PrimeBiome Quiz Results",
-    ebookUrl: "https://drive.google.com/file/d/16IwQhvWPM3yxEt-5ToYmJYmf1wBOYGXq/view?usp=sharing", // Your Main Guide
+    ebookUrl: "https://drive.google.com/file/d/16IwQhvWPM3yxEt-5ToYmJYmf1wBOYGXq/view?usp=sharing", // Main Guide
     ebookUrl2: "https://drive.google.com/file/d/1-p_1JnsA8cSRG8IMwpbQ-amLP_tyFbJ7/view?usp=drive_link", // Skin Vitality Checklist
     generateEmailHtml: templates.primebiome
   },
